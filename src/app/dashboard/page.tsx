@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PostCard } from "@/components/post-card";
+import AutoGenerate from "@/components/auto-generate";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -48,19 +49,22 @@ export default async function DashboardPage() {
               {posts?.length ?? 0} posts generated
             </p>
           </div>
-          <Link
-            href="/dashboard/editor"
-            className="bg-accent hover:bg-accent/90 text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm"
-          >
-            Crear post
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/editor"
+              className="bg-surface-light hover:bg-surface-border text-neutral-300 font-medium px-4 py-2.5 rounded-lg transition-colors text-sm border border-surface-border"
+            >
+              Crear manualmente
+            </Link>
+            <AutoGenerate brand={brand} />
+          </div>
         </div>
 
         {!posts?.length ? (
           <div className="text-center py-20 border border-dashed border-surface-border rounded-xl">
             <p className="text-neutral-400 mb-4">No posts yet</p>
             <p className="text-sm text-neutral-500">
-              Click &quot;Crear post&quot; to open the template editor
+              Click &quot;Generar parrilla&quot; to auto-generate your first post
             </p>
           </div>
         ) : (
