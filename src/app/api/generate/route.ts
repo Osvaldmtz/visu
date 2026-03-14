@@ -68,9 +68,14 @@ async function generateContent(brandName: string, prompt: string, needsSubtitle:
   });
 
   const data = await res.json();
+  if (!data.content?.[0]?.text) {
+    console.error("Anthropic response missing content:", JSON.stringify(data));
+    throw new Error("Empty response from Anthropic");
+  }
   let raw = data.content[0].text.trim();
   if (raw.startsWith("```")) {
-    raw = raw.split("\n", 1)[1] || raw.slice(3);
+    const lines = raw.split("\n");
+    raw = lines.slice(1).join("\n");
     if (raw.endsWith("```")) raw = raw.slice(0, -3).trim();
   }
   return JSON.parse(raw);
@@ -122,13 +127,20 @@ export async function POST(request: Request) {
   const { brandId, layout: singleLayout, replaceId } = await request.json();
 
   const supabase = await createClient();
-  const { data: brand } = await supabase
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { data: brand, error: brandError } = await supabase
     .from("brands")
     .select("*")
     .eq("id", brandId)
     .single();
 
-  if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+  if (!brand) {
+    console.error("Brand lookup failed:", { brandId, userId: user.id, error: brandError });
+    return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+  }
 
   const allLayouts = brand.active_layouts ?? [0, 1, 2, 3];
   const layouts = singleLayout !== undefined ? [singleLayout] : allLayouts;
