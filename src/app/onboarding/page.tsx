@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 const FONTS = ["Inter", "Poppins", "Montserrat", "Playfair Display", "Raleway"];
 
@@ -102,9 +103,62 @@ export default function OnboardingPage() {
   const toggleLayout = (id: string) =>
     setActiveLayouts((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const handleCreate = () => {
-    // Placeholder — will connect to Supabase later
-    router.push("/dashboard");
+  const [saving, setSaving] = useState(false);
+
+  const handleCreate = async () => {
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+
+      // Convert layout toggles to index array
+      const layoutKeys = ["overlay", "split", "minimal", "photo"];
+      const layoutIndexes = layoutKeys
+        .map((k, i) => (activeLayouts[k] ? i : -1))
+        .filter((i) => i >= 0);
+
+      // 1. Create brand
+      const { data: brand, error: brandErr } = await supabase
+        .from("brands")
+        .insert({
+          user_id: user.id,
+          name: brandName,
+          primary_color: primaryColor,
+          secondary_color: secondaryColor,
+          font_family: font,
+          active_layouts: layoutIndexes,
+          ig_handle: igHandle || null,
+          fb_page: fbPage || null,
+          tiktok_handle: tiktokHandle || null,
+        })
+        .select("id")
+        .single();
+
+      if (brandErr || !brand) throw new Error(brandErr?.message ?? "Brand creation failed");
+
+      // 2. Upload logos via /api/upload-logo
+      for (const [file, variant] of [
+        [logoLightFile, "light"],
+        [logoDarkFile, "dark"],
+      ] as const) {
+        if (!file) continue;
+        const form = new FormData();
+        form.append("file", file);
+        form.append("brandId", brand.id);
+        form.append("variant", variant);
+        const res = await fetch("/api/upload-logo", { method: "POST", body: form });
+        if (!res.ok) {
+          const err = await res.json();
+          console.error(`Logo upload (${variant}) failed:`, err);
+        }
+      }
+
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Onboarding error:", err);
+      setSaving(false);
+    }
   };
 
   const canAdvance = () => {
@@ -227,9 +281,10 @@ export default function OnboardingPage() {
           ) : (
             <button
               onClick={handleCreate}
-              className="px-8 py-3 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              disabled={saving}
+              className="px-8 py-3 rounded-lg bg-accent hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              Crear mi marca
+              {saving ? "Guardando..." : "Crear mi marca"}
             </button>
           )}
         </div>
