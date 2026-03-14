@@ -1,0 +1,78 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export const maxDuration = 30;
+
+export async function POST(request: Request) {
+  const formData = await request.formData();
+  const file = formData.get("file") as File;
+  const brandId = formData.get("brandId") as string;
+  const layout = formData.get("layout") as string;
+  const title = formData.get("title") as string;
+  const caption = formData.get("caption") as string;
+  const postId = formData.get("postId") as string | null;
+
+  if (!file || !brandId) {
+    return NextResponse.json({ error: "Missing file or brandId" }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Verify brand ownership
+  const { data: brand } = await supabase
+    .from("brands")
+    .select("id")
+    .eq("id", brandId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+
+  // Upload PNG to Supabase Storage
+  const fileName = `${brandId}/${Date.now()}-layout${layout}.png`;
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = new Uint8Array(arrayBuffer);
+
+  const { error: uploadError } = await supabase.storage
+    .from("posts")
+    .upload(fileName, buffer, {
+      contentType: "image/png",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    console.error("Upload error:", uploadError);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from("posts")
+    .getPublicUrl(fileName);
+
+  const postData = {
+    brand_id: brandId,
+    layout: parseInt(layout),
+    image_url: publicUrl,
+    caption: caption || "",
+    title: title || "",
+    status: "APPROVED",
+  };
+
+  if (postId) {
+    const { error } = await supabase.from("posts").update(postData).eq("id", postId);
+    if (error) {
+      console.error("Update error:", error);
+      return NextResponse.json({ error: "Update failed" }, { status: 500 });
+    }
+  } else {
+    const { error } = await supabase.from("posts").insert(postData);
+    if (error) {
+      console.error("Insert error:", error);
+      return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, imageUrl: publicUrl });
+}

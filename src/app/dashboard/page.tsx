@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { GenerateButton } from "@/components/generate-button";
 import { PostCard } from "@/components/post-card";
 
 export default async function DashboardPage() {
@@ -49,14 +48,19 @@ export default async function DashboardPage() {
               {posts?.length ?? 0} posts generated
             </p>
           </div>
-          <GenerateButton brandId={brand.id} />
+          <Link
+            href="/dashboard/editor"
+            className="bg-accent hover:bg-accent/90 text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm"
+          >
+            Crear post
+          </Link>
         </div>
 
         {!posts?.length ? (
           <div className="text-center py-20 border border-dashed border-surface-border rounded-xl">
             <p className="text-neutral-400 mb-4">No posts yet</p>
             <p className="text-sm text-neutral-500">
-              Click "Generate grid" to create your first content batch
+              Click &quot;Crear post&quot; to open the template editor
             </p>
           </div>
         ) : (
