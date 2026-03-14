@@ -47,6 +47,66 @@ async function generateContent(brandName: string, prompt: string, needsSubtitle:
   return JSON.parse(raw);
 }
 
+async function getNextScheduledDate(
+  preferredDays: number[],
+  publishTime: string,
+  timezone: string,
+  brandId: string,
+  supabase: any
+): Promise<string> {
+  // Get existing scheduled posts to avoid double-booking
+  const { data: existing } = await supabase
+    .from("posts")
+    .select("scheduled_at")
+    .eq("brand_id", brandId)
+    .not("scheduled_at", "is", null);
+
+  const bookedDates = new Set(
+    (existing ?? []).map((p: any) =>
+      new Date(p.scheduled_at).toISOString().split("T")[0]
+    )
+  );
+
+  const [hours, minutes] = publishTime.split(":").map(Number);
+  const now = new Date();
+
+  // Search up to 8 weeks ahead
+  for (let offset = 0; offset < 56; offset++) {
+    const candidate = new Date(now);
+    candidate.setDate(candidate.getDate() + offset);
+
+    // JS getDay(): 0=Sun, we need 1=Mon..7=Sun
+    const jsDay = candidate.getDay();
+    const isoDay = jsDay === 0 ? 7 : jsDay;
+
+    if (!preferredDays.includes(isoDay)) continue;
+
+    const dateStr = candidate.toISOString().split("T")[0];
+    if (bookedDates.has(dateStr)) continue;
+
+    // Build the datetime string in the brand's timezone
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const localDatetime = `${dateStr}T${pad(hours)}:${pad(minutes)}:00`;
+
+    // Convert to UTC using the timezone offset
+    const inTz = new Date(
+      new Date(localDatetime).toLocaleString("en-US", { timeZone: timezone })
+    );
+    const utcDate = new Date(
+      new Date(localDatetime).getTime() +
+        (new Date(localDatetime).getTime() - inTz.getTime())
+    );
+
+    return utcDate.toISOString();
+  }
+
+  // Fallback: tomorrow at publish time
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateStr = tomorrow.toISOString().split("T")[0];
+  return new Date(`${dateStr}T${publishTime}:00Z`).toISOString();
+}
+
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
@@ -69,10 +129,21 @@ export async function POST(request: Request) {
 
   try {
     const content = await generateContent(brand.name, CONTENT_PROMPTS[idx], needsSubtitle);
+
+    // Calculate next scheduled_at based on brand frequency settings
+    const scheduledAt = getNextScheduledDate(
+      brand.preferred_days ?? [1],
+      brand.publish_time ?? "09:00",
+      brand.timezone ?? "America/Mexico_City",
+      brandId,
+      supabase
+    );
+
     return NextResponse.json({
       title: content.title,
       subtitle: content.subtitle ?? null,
       caption: `${content.caption}\n\n${content.hashtags}`,
+      scheduled_at: await scheduledAt,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

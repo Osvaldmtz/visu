@@ -58,10 +58,14 @@ export default function OnboardingPage() {
     photo: true,
   });
 
-  // Step 3 — Social
+  // Step 3 — Social & Frequency
   const [igHandle, setIgHandle] = useState("");
   const [fbPage, setFbPage] = useState("");
   const [tiktokHandle, setTiktokHandle] = useState("");
+  const [postsPerWeek, setPostsPerWeek] = useState(1);
+  const [preferredDays, setPreferredDays] = useState<number[]>([1]);
+  const [publishTime, setPublishTime] = useState("09:00");
+  const [timezone, setTimezone] = useState("America/Mexico_City");
 
   const lightInputRef = useRef<HTMLInputElement>(null);
   const darkInputRef = useRef<HTMLInputElement>(null);
@@ -131,6 +135,10 @@ export default function OnboardingPage() {
           ig_handle: igHandle || null,
           fb_page: fbPage || null,
           tiktok_handle: tiktokHandle || null,
+          posts_per_week: postsPerWeek,
+          preferred_days: preferredDays,
+          publish_time: publishTime,
+          timezone,
         })
         .select("id")
         .single();
@@ -165,6 +173,7 @@ export default function OnboardingPage() {
     if (step === 1) return brandName.trim().length > 0 && logoLightFile !== null;
     if (step === 2)
       return Object.values(activeLayouts).some((v) => v);
+    if (step === 3) return preferredDays.length === postsPerWeek;
     return true;
   };
 
@@ -237,6 +246,14 @@ export default function OnboardingPage() {
               setFbPage={setFbPage}
               tiktokHandle={tiktokHandle}
               setTiktokHandle={setTiktokHandle}
+              postsPerWeek={postsPerWeek}
+              setPostsPerWeek={setPostsPerWeek}
+              preferredDays={preferredDays}
+              setPreferredDays={setPreferredDays}
+              publishTime={publishTime}
+              setPublishTime={setPublishTime}
+              timezone={timezone}
+              setTimezone={setTimezone}
             />
           )}
           {step === 4 && (
@@ -526,6 +543,17 @@ function StepLayouts({
 
 /* ─── Step 3: Social ─── */
 
+const DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+const TIMEZONES = [
+  { value: "America/Mexico_City", label: "CDMX (UTC-6)" },
+  { value: "America/Bogota", label: "Bogotá (UTC-5)" },
+  { value: "America/Lima", label: "Lima (UTC-5)" },
+  { value: "America/Santiago", label: "Santiago (UTC-4)" },
+  { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires (UTC-3)" },
+  { value: "America/Caracas", label: "Caracas (UTC-4)" },
+];
+
 function StepSocial({
   igHandle,
   setIgHandle,
@@ -533,6 +561,14 @@ function StepSocial({
   setFbPage,
   tiktokHandle,
   setTiktokHandle,
+  postsPerWeek,
+  setPostsPerWeek,
+  preferredDays,
+  setPreferredDays,
+  publishTime,
+  setPublishTime,
+  timezone,
+  setTimezone,
 }: {
   igHandle: string;
   setIgHandle: (v: string) => void;
@@ -540,14 +576,32 @@ function StepSocial({
   setFbPage: (v: string) => void;
   tiktokHandle: string;
   setTiktokHandle: (v: string) => void;
+  postsPerWeek: number;
+  setPostsPerWeek: (v: number) => void;
+  preferredDays: number[];
+  setPreferredDays: (v: number[]) => void;
+  publishTime: string;
+  setPublishTime: (v: string) => void;
+  timezone: string;
+  setTimezone: (v: string) => void;
 }) {
+  const toggleDay = (day: number) => {
+    setPreferredDays(
+      preferredDays.includes(day)
+        ? preferredDays.filter((d) => d !== day)
+        : [...preferredDays, day].sort((a, b) => a - b)
+    );
+  };
+
+  const daysError =
+    preferredDays.length > 0 && preferredDays.length !== postsPerWeek;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold mb-1">Redes sociales</h1>
         <p className="text-neutral-400 text-sm">
-          Visu publicará automáticamente en tus cuentas. Nos contactaremos para
-          completar la conexión.
+          Configura tus cuentas y frecuencia de publicación.
         </p>
       </div>
 
@@ -577,6 +631,83 @@ function StepSocial({
           placeholder="@tu_marca"
         />
       </Field>
+
+      {/* Divider */}
+      <div className="border-t border-surface-border pt-6">
+        <h2 className="text-lg font-semibold mb-1">Frecuencia de publicación</h2>
+        <p className="text-neutral-400 text-sm mb-4">
+          Define cuándo y con qué frecuencia publicar.
+        </p>
+      </div>
+
+      {/* Posts per week */}
+      <Field label="¿Cuántas veces por semana quieres publicar?">
+        <div className="flex gap-2">
+          {[1, 2, 3, 4].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setPostsPerWeek(n)}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                postsPerWeek === n
+                  ? "bg-accent text-white"
+                  : "bg-surface-light border border-surface-border text-neutral-400 hover:border-accent/50"
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      {/* Preferred days */}
+      <Field label={`¿Qué días prefieres? (selecciona ${postsPerWeek})`}>
+        <div className="flex gap-2">
+          {DAY_LABELS.map((label, i) => {
+            const day = i + 1;
+            const selected = preferredDays.includes(day);
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => toggleDay(day)}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+                  selected
+                    ? "bg-accent text-white"
+                    : "bg-surface-light border border-surface-border text-neutral-400 hover:border-accent/50"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {daysError && (
+          <p className="text-amber-400 text-xs mt-1.5">
+            Selecciona exactamente {postsPerWeek} día{postsPerWeek > 1 ? "s" : ""}
+          </p>
+        )}
+      </Field>
+
+      {/* Publish time & timezone */}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Hora de publicación">
+          <input
+            type="time"
+            value={publishTime}
+            onChange={(e) => setPublishTime(e.target.value)}
+          />
+        </Field>
+        <Field label="Zona horaria">
+          <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+            {TIMEZONES.map((tz) => (
+              <option key={tz.value} value={tz.value}>
+                {tz.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
     </div>
   );
 }
