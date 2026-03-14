@@ -91,7 +91,12 @@ async function generateFalBackground(prompt: string): Promise<string | null> {
       },
       body: JSON.stringify({ prompt, image_size: "square_hd", num_images: 1 }),
     });
-    const { response_url } = await res.json();
+    const body = await res.json();
+    if (!res.ok) {
+      console.error("FAL queue error:", res.status, JSON.stringify(body));
+      return null;
+    }
+    const { response_url } = body;
 
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 3000));
@@ -101,8 +106,10 @@ async function generateFalBackground(prompt: string): Promise<string | null> {
       const data = await poll.json();
       if (data.images) return data.images[0].url;
     }
+    console.error("FAL polling timed out after 60s");
     return null;
-  } catch {
+  } catch (e: any) {
+    console.error("FAL error:", e.message);
     return null;
   }
 }
@@ -120,6 +127,10 @@ async function renderImage(
     body: JSON.stringify({ template: templateId, layers }),
   });
   const data = await res.json();
+  if (!res.ok || !data.render_url) {
+    console.error("Templated error:", res.status, JSON.stringify(data));
+    throw new Error(`Templated render failed: ${data.error || res.status}`);
+  }
   return data.render_url;
 }
 
