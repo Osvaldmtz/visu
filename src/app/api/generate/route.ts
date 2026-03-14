@@ -153,8 +153,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Brand not found" }, { status: 404 });
   }
 
-  const allLayouts = brand.active_layouts ?? [0, 1, 2, 3];
-  const layouts = singleLayout !== undefined ? [singleLayout] : allLayouts;
+  const layouts = singleLayout !== undefined ? [singleLayout] : [0];
   const templateIds = [
     process.env.TEMPLATED_TEMPLATE_0!,
     process.env.TEMPLATED_TEMPLATE_1!,
