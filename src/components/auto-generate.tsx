@@ -15,6 +15,21 @@ interface Brand {
   active_layouts: number[];
 }
 
+/** Fetch an image URL and return a base64 data URL (avoids CORS issues in html-to-image) */
+async function toDataUrl(url: string): Promise<string> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url; // fallback to original URL
+  }
+}
+
 export default function AutoGenerate({ brand }: { brand: Brand }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -26,18 +41,18 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     subtitle: string;
     caption: string;
     scheduledAt: string | null;
+    logoDataUrl: string;
   } | null>(null);
 
-  // Pick layout — cycle through active layouts, default to 0
+  // Pick layout — cycle through active layouts, prefer layouts without photo dependency
   const pickLayout = useCallback(() => {
     const layouts = brand.active_layouts ?? [0];
-    // Pick randomly from active layouts, but avoid 1 and 3 (need photos)
     const safe = layouts.filter((l) => l === 0 || l === 2);
     if (safe.length > 0) return safe[Math.floor(Math.random() * safe.length)];
     return layouts[0] ?? 0;
   }, [brand.active_layouts]);
 
-  const logoUrl = useCallback(
+  const getLogoUrl = useCallback(
     (layout: number) =>
       layout <= 1
         ? brand.logo_light_url || brand.logo_url || ""
@@ -45,21 +60,20 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     [brand]
   );
 
-  // When pendingRender is set, wait for React to paint the template, then capture + upload
+  // When pendingRender is set, wait for React to paint, then capture + upload
   useEffect(() => {
     if (!pendingRender) return;
+    let cancelled = false;
 
     const captureAndUpload = async () => {
       setStatus("rendering");
 
-      // Wait for React to paint the template into the DOM
+      // Wait for React to paint
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      // Extra delay for fonts/images to load
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 500));
 
-      if (!canvasRef.current) {
-        setError("Canvas not found");
-        setStatus("error");
+      if (cancelled || !canvasRef.current) {
+        if (!cancelled) { setError("Canvas not found"); setStatus("error"); }
         return;
       }
 
@@ -100,8 +114,6 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         setStatus("done");
         setPendingRender(null);
         router.refresh();
-
-        // Reset to idle after a moment
         setTimeout(() => setStatus("idle"), 1500);
       } catch (e: any) {
         console.error("Auto-generate error:", e);
@@ -112,6 +124,7 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     };
 
     captureAndUpload();
+    return () => { cancelled = true; };
   }, [pendingRender, brand.id, router]);
 
   const handleGenerate = async () => {
@@ -121,6 +134,11 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     const layout = pickLayout();
 
     try {
+      // 1. Pre-load logo as data URL to avoid CORS issues
+      const logoSrc = getLogoUrl(layout);
+      const logoDataUrl = logoSrc ? await toDataUrl(logoSrc) : "";
+
+      // 2. Generate content with AI
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,13 +152,14 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
 
       const data = await res.json();
 
-      // Set pending render — this triggers the useEffect to capture + upload
+      // 3. Trigger render
       setPendingRender({
         layout,
         title: data.title ?? "",
         subtitle: data.subtitle ?? "",
         caption: data.caption ?? "",
         scheduledAt: data.scheduled_at ?? null,
+        logoDataUrl,
       });
     } catch (e: any) {
       console.error("Generate error:", e);
@@ -182,17 +201,19 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         <p className="text-xs text-red-400 mt-1">{error}</p>
       )}
 
-      {/* Off-screen canvas for rendering the template */}
+      {/* Off-screen canvas — uses visibility:hidden so images still load */}
       {pendingRender && (
         <div
           style={{
             position: "fixed",
-            left: "-9999px",
-            top: "-9999px",
+            top: 0,
+            left: 0,
             width: 1080,
             height: 1080,
             overflow: "hidden",
             pointerEvents: "none",
+            opacity: 0,
+            zIndex: -1,
           }}
           aria-hidden="true"
         >
@@ -200,7 +221,7 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
             {renderTemplate(pendingRender.layout, {
               title: pendingRender.title,
               subtitle: pendingRender.subtitle,
-              logoUrl: logoUrl(pendingRender.layout),
+              logoUrl: pendingRender.logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
             })}
           </div>

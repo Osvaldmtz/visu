@@ -6,6 +6,21 @@ import { createClient } from "@/lib/supabase/client";
 import { toPng } from "html-to-image";
 import { renderTemplate } from "@/components/templates";
 
+/** Fetch an image URL and return a base64 data URL (avoids CORS issues in html-to-image) */
+async function toDataUrl(url: string): Promise<string> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
+}
+
 export default function PostReviewPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -46,13 +61,19 @@ export default function PostReviewPage() {
     router.refresh();
   };
 
-  // Regenerate: call AI → render off-screen → capture → upload replacing this post
   const handleRegenerate = async () => {
     if (!brand) return;
     setLoading("REGENERATE");
 
     try {
-      // 1. Generate new content
+      // Pre-load logo as data URL
+      const logoSrc =
+        post.layout <= 1
+          ? brand.logo_light_url || brand.logo_url || ""
+          : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "";
+      const logoDataUrl = logoSrc ? await toDataUrl(logoSrc) : "";
+
+      // Generate new content
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,12 +82,12 @@ export default function PostReviewPage() {
       if (!res.ok) throw new Error("Generation failed");
       const data = await res.json();
 
-      // 2. Set regen data → triggers off-screen render
       setRegenData({
         title: data.title ?? "",
         subtitle: data.subtitle ?? "",
         caption: data.caption ?? "",
         scheduledAt: data.scheduled_at ?? null,
+        logoDataUrl,
       });
     } catch (e: any) {
       console.error("Regenerate error:", e);
@@ -77,14 +98,14 @@ export default function PostReviewPage() {
   // When regenData is set, wait for paint then capture + upload
   useEffect(() => {
     if (!regenData || !brand || !post) return;
+    let cancelled = false;
 
     const captureAndUpload = async () => {
-      // Wait for render
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 500));
 
-      if (!canvasRef.current) {
-        setLoading("");
+      if (cancelled || !canvasRef.current) {
+        if (!cancelled) setLoading("");
         return;
       }
 
@@ -129,6 +150,7 @@ export default function PostReviewPage() {
     };
 
     captureAndUpload();
+    return () => { cancelled = true; };
   }, [regenData, brand, post, router]);
 
   if (!post || !brand) {
@@ -138,11 +160,6 @@ export default function PostReviewPage() {
       </div>
     );
   }
-
-  const logoUrl =
-    post.layout <= 1
-      ? brand.logo_light_url || brand.logo_url || ""
-      : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "";
 
   return (
     <div className="min-h-screen px-4 py-8">
@@ -207,12 +224,14 @@ export default function PostReviewPage() {
         <div
           style={{
             position: "fixed",
-            left: "-9999px",
-            top: "-9999px",
+            top: 0,
+            left: 0,
             width: 1080,
             height: 1080,
             overflow: "hidden",
             pointerEvents: "none",
+            opacity: 0,
+            zIndex: -1,
           }}
           aria-hidden="true"
         >
@@ -220,7 +239,7 @@ export default function PostReviewPage() {
             {renderTemplate(post.layout, {
               title: regenData.title,
               subtitle: regenData.subtitle,
-              logoUrl,
+              logoUrl: regenData.logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
             })}
           </div>

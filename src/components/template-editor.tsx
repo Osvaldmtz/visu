@@ -4,6 +4,20 @@ import React, { useRef, useState, useCallback, useEffect } from "react";
 import { toPng } from "html-to-image";
 import { renderTemplate, TEMPLATE_NAMES } from "./templates";
 
+async function toDataUrl(url: string): Promise<string> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
+}
+
 interface Brand {
   id: string;
   name: string;
@@ -53,6 +67,7 @@ export default function TemplateEditor({
   const [photoResults, setPhotoResults] = useState<any[]>([]);
   const [searchingPhotos, setSearchingPhotos] = useState(false);
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [logoDataUrl, setLogoDataUrl] = useState("");
 
   // Pick the right logo variant based on layout
   const logoUrl =
@@ -60,10 +75,19 @@ export default function TemplateEditor({
       ? brand.logo_light_url || brand.logo_url || ""
       : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "";
 
+  // Pre-load logo as data URL for html-to-image export
+  useEffect(() => {
+    if (logoUrl) {
+      toDataUrl(logoUrl).then(setLogoDataUrl);
+    } else {
+      setLogoDataUrl("");
+    }
+  }, [logoUrl]);
+
   const templateProps = {
     title: title || "Tu titulo aqui",
     subtitle,
-    logoUrl,
+    logoUrl: logoDataUrl || logoUrl,
     primaryColor,
     backgroundUrl: backgroundUrl || undefined,
   };
