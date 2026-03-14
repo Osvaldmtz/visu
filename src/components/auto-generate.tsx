@@ -26,7 +26,7 @@ async function toDataUrl(url: string): Promise<string> {
       reader.readAsDataURL(blob);
     });
   } catch {
-    return url; // fallback to original URL
+    return url;
   }
 }
 
@@ -42,14 +42,13 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     caption: string;
     scheduledAt: string | null;
     logoDataUrl: string;
+    bgDataUrl: string;
   } | null>(null);
 
-  // Pick layout — cycle through active layouts, prefer layouts without photo dependency
+  // Pick layout — randomly from all active layouts
   const pickLayout = useCallback(() => {
     const layouts = brand.active_layouts ?? [0];
-    const safe = layouts.filter((l) => l === 0 || l === 2);
-    if (safe.length > 0) return safe[Math.floor(Math.random() * safe.length)];
-    return layouts[0] ?? 0;
+    return layouts[Math.floor(Math.random() * layouts.length)];
   }, [brand.active_layouts]);
 
   const getLogoUrl = useCallback(
@@ -68,9 +67,9 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     const captureAndUpload = async () => {
       setStatus("rendering");
 
-      // Wait for React to paint
+      // Wait for React to paint + images to decode
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 800));
 
       if (cancelled || !canvasRef.current) {
         if (!cancelled) { setError("Canvas not found"); setStatus("error"); }
@@ -134,11 +133,11 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     const layout = pickLayout();
 
     try {
-      // 1. Pre-load logo as data URL to avoid CORS issues
+      // 1. Pre-load logo as data URL
       const logoSrc = getLogoUrl(layout);
       const logoDataUrl = logoSrc ? await toDataUrl(logoSrc) : "";
 
-      // 2. Generate content with AI
+      // 2. Generate content with AI (includes Unsplash search server-side)
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -152,7 +151,13 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
 
       const data = await res.json();
 
-      // 3. Trigger render
+      // 3. Pre-load background photo as data URL if present
+      let bgDataUrl = "";
+      if (data.backgroundUrl) {
+        bgDataUrl = await toDataUrl(data.backgroundUrl);
+      }
+
+      // 4. Trigger render
       setPendingRender({
         layout,
         title: data.title ?? "",
@@ -160,6 +165,7 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         caption: data.caption ?? "",
         scheduledAt: data.scheduled_at ?? null,
         logoDataUrl,
+        bgDataUrl,
       });
     } catch (e: any) {
       console.error("Generate error:", e);
@@ -201,7 +207,7 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         <p className="text-xs text-red-400 mt-1">{error}</p>
       )}
 
-      {/* Off-screen canvas — uses visibility:hidden so images still load */}
+      {/* Off-screen canvas */}
       {pendingRender && (
         <div
           style={{
@@ -223,6 +229,7 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
               subtitle: pendingRender.subtitle,
               logoUrl: pendingRender.logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
+              backgroundUrl: pendingRender.bgDataUrl || undefined,
             })}
           </div>
         </div>

@@ -73,7 +73,7 @@ export default function PostReviewPage() {
           : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "";
       const logoDataUrl = logoSrc ? await toDataUrl(logoSrc) : "";
 
-      // Generate new content
+      // Generate new content (includes Unsplash search server-side)
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,12 +82,19 @@ export default function PostReviewPage() {
       if (!res.ok) throw new Error("Generation failed");
       const data = await res.json();
 
+      // Pre-load background photo as data URL if present
+      let bgDataUrl = "";
+      if (data.backgroundUrl) {
+        bgDataUrl = await toDataUrl(data.backgroundUrl);
+      }
+
       setRegenData({
         title: data.title ?? "",
         subtitle: data.subtitle ?? "",
         caption: data.caption ?? "",
         scheduledAt: data.scheduled_at ?? null,
         logoDataUrl,
+        bgDataUrl,
       });
     } catch (e: any) {
       console.error("Regenerate error:", e);
@@ -102,7 +109,7 @@ export default function PostReviewPage() {
 
     const captureAndUpload = async () => {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 800));
 
       if (cancelled || !canvasRef.current) {
         if (!cancelled) setLoading("");
@@ -241,6 +248,7 @@ export default function PostReviewPage() {
               subtitle: regenData.subtitle,
               logoUrl: regenData.logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
+              backgroundUrl: regenData.bgDataUrl || undefined,
             })}
           </div>
         </div>

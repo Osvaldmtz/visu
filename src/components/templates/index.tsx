@@ -22,6 +22,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           title={props.title}
           logoUrl={props.logoUrl}
           primaryColor={props.primaryColor}
+          backgroundUrl={props.backgroundUrl}
         />
       );
     case 1:

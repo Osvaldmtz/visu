@@ -37,7 +37,7 @@ async function generateContent(
       messages: [
         {
           role: "user",
-          content: `${prompt}${topicsBlock}\n\nRespond ONLY with valid JSON:\n{\n  "title": "short image text (max 6 words)",\n${subtitleField}  "caption": "full caption (max 280 chars)",\n  "hashtags": "#relevant #hashtags"\n}`,
+          content: `${prompt}${topicsBlock}\n\nRespond ONLY with valid JSON:\n{\n  "title": "short image text (max 6 words)",\n${subtitleField}  "caption": "full caption (max 280 chars)",\n  "hashtags": "#relevant #hashtags",\n  "photo_query": "2-3 english keywords for a relevant background photo (professional, clinical, abstract)"\n}`,
         },
       ],
     }),
@@ -55,6 +55,27 @@ async function generateContent(
     if (raw.endsWith("```")) raw = raw.slice(0, -3).trim();
   }
   return JSON.parse(raw);
+}
+
+async function searchUnsplash(query: string): Promise<string | null> {
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!key || !query) return null;
+
+  try {
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=squarish`,
+      { headers: { Authorization: `Client-ID ${key}` } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results = data.results ?? [];
+    if (results.length === 0) return null;
+    // Pick a random photo from top 5
+    const photo = results[Math.floor(Math.random() * results.length)];
+    return photo.urls?.regular ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function getNextScheduledDate(
@@ -130,6 +151,7 @@ export async function POST(request: Request) {
 
   const idx = layout ?? 0;
   const needsSubtitle = idx === 1 || idx === 2;
+  const needsBackground = idx === 0 || idx === 1 || idx === 3;
 
   // Fetch last 20 used topics to avoid repetition
   const { data: topicRows } = await supabase
@@ -150,6 +172,12 @@ export async function POST(request: Request) {
       await supabase.from("post_topics").insert({ brand_id: brandId, topic });
     }
 
+    // Search Unsplash for a background photo if the layout needs one
+    let backgroundUrl: string | null = null;
+    if (needsBackground && content.photo_query) {
+      backgroundUrl = await searchUnsplash(content.photo_query);
+    }
+
     const scheduledAt = getNextScheduledDate(
       brand.preferred_days ?? [1],
       brand.publish_time ?? "09:00",
@@ -163,6 +191,7 @@ export async function POST(request: Request) {
       subtitle: content.subtitle ?? null,
       caption: `${content.caption}\n\n${content.hashtags}`,
       scheduled_at: await scheduledAt,
+      backgroundUrl,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
