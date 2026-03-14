@@ -313,50 +313,52 @@ function LogoDropZone({
   onDrop: (e: React.DragEvent) => void;
 }) {
   return (
-    <div
-      onDrop={onDrop}
-      onDragOver={(e) => e.preventDefault()}
-      onClick={() => inputRef.current?.click()}
-      className="border-2 border-dashed border-surface-border hover:border-accent/50 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer transition-colors min-h-[140px]"
-      style={{ backgroundColor: bgColor }}
-    >
-      {preview ? (
-        <img
-          src={preview}
-          alt={label}
-          className="max-h-20 max-w-full object-contain"
-        />
-      ) : (
-        <>
-          <svg
-            className="w-7 h-7 text-neutral-500 mb-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 16v-8m0 0l-3 3m3-3l3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1"
-            />
-          </svg>
-          <span className="text-neutral-400 text-sm">{label}</span>
-          <span className="text-neutral-600 text-xs mt-1">{hint}</span>
-        </>
-      )}
+    <>
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
         className="hidden"
-        onClick={(e) => e.stopPropagation()}
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) onSelect(file);
+          e.target.value = "";
         }}
       />
-    </div>
+      <div
+        onDrop={onDrop}
+        onDragOver={(e) => e.preventDefault()}
+        onClick={() => inputRef.current?.click()}
+        className="border-2 border-dashed border-surface-border hover:border-accent/50 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer transition-colors min-h-[140px]"
+        style={{ backgroundColor: bgColor }}
+      >
+        {preview ? (
+          <img
+            src={preview}
+            alt={label}
+            className="max-h-20 max-w-full object-contain"
+          />
+        ) : (
+          <>
+            <svg
+              className="w-7 h-7 text-neutral-500 mb-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 16v-8m0 0l-3 3m3-3l3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1"
+              />
+            </svg>
+            <span className="text-neutral-400 text-sm">{label}</span>
+            <span className="text-neutral-600 text-xs mt-1">{hint}</span>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
