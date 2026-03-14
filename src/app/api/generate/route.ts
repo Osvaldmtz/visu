@@ -1,0 +1,165 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+const LAYOUT_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
+
+const FAL_PROMPTS = [
+  "Pure deep purple gradient background, smooth bokeh light spots, no objects no people no text, minimal abstract",
+  "Soft purple gradient, subtle light leak, no objects no people no text, clean abstract",
+  null,
+  null,
+];
+
+const CONTENT_PROMPTS = [
+  "Create an educational post about a clinical assessment tool. Include a specific clinical statistic.",
+  "Create a post showing time savings. Use concrete numbers contrasting before vs after.",
+  "Create a post that connects with professional burnout and documentation frustration.",
+  "Create a post showcasing a specific product feature with its clinical benefit.",
+];
+
+async function generateContent(brandName: string, prompt: string, needsSubtitle: boolean) {
+  const subtitleField = needsSubtitle
+    ? '  "subtitle": "short secondary phrase (max 10 words)",\n'
+    : "";
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      system: `You are the social media manager for ${brandName}. Write in professional Spanish (Latin American). Be concise and clinical.`,
+      messages: [
+        {
+          role: "user",
+          content: `${prompt}\n\nRespond ONLY with valid JSON:\n{\n  "title": "short image text (max 6 words)",\n${subtitleField}  "caption": "full caption (max 280 chars)",\n  "hashtags": "#relevant #hashtags"\n}`,
+        },
+      ],
+    }),
+  });
+
+  const data = await res.json();
+  let raw = data.content[0].text.trim();
+  if (raw.startsWith("```")) {
+    raw = raw.split("\n", 1)[1] || raw.slice(3);
+    if (raw.endsWith("```")) raw = raw.slice(0, -3).trim();
+  }
+  return JSON.parse(raw);
+}
+
+async function generateFalBackground(prompt: string): Promise<string | null> {
+  try {
+    const res = await fetch("https://queue.fal.run/fal-ai/flux/schnell", {
+      method: "POST",
+      headers: {
+        Authorization: `Key ${process.env.FAL_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt, image_size: "square_hd", num_images: 1 }),
+    });
+    const { response_url } = await res.json();
+
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const poll = await fetch(response_url, {
+        headers: { Authorization: `Key ${process.env.FAL_KEY}` },
+      });
+      const data = await poll.json();
+      if (data.images) return data.images[0].url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function renderImage(
+  templateId: string,
+  layers: Record<string, any>
+): Promise<string> {
+  const res = await fetch("https://api.templated.io/v1/render", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.TEMPLATED_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ template: templateId, layers }),
+  });
+  const data = await res.json();
+  return data.render_url;
+}
+
+export async function POST(request: Request) {
+  const { brandId, layout: singleLayout, replaceId } = await request.json();
+
+  const supabase = await createClient();
+  const { data: brand } = await supabase
+    .from("brands")
+    .select("*")
+    .eq("id", brandId)
+    .single();
+
+  if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+
+  const layouts = singleLayout !== undefined ? [singleLayout] : [0, 1, 2, 3];
+  const templateIds = [
+    process.env.TEMPLATED_TEMPLATE_0!,
+    process.env.TEMPLATED_TEMPLATE_1!,
+    process.env.TEMPLATED_TEMPLATE_2!,
+    process.env.TEMPLATED_TEMPLATE_3!,
+  ];
+
+  const results = [];
+
+  for (const idx of layouts) {
+    try {
+      const content = await generateContent(
+        brand.name,
+        CONTENT_PROMPTS[idx],
+        idx === 1 || idx === 2
+      );
+
+      const falPrompt = FAL_PROMPTS[idx];
+      const bgUrl = falPrompt ? await generateFalBackground(falPrompt) : null;
+
+      const layers: Record<string, any> = { title: { text: content.title } };
+
+      if (brand.logo_url) {
+        layers.logo = { image_url: brand.logo_url };
+      }
+      if (content.subtitle) {
+        layers.subtitle = { text: content.subtitle };
+      }
+      if (bgUrl) {
+        layers.background = { image_url: bgUrl };
+      }
+
+      const imageUrl = await renderImage(templateIds[idx], layers);
+
+      const postData = {
+        brand_id: brandId,
+        layout: idx,
+        image_url: imageUrl,
+        caption: `${content.caption}\n\n${content.hashtags}`,
+        title: content.title,
+        status: "DRAFT",
+      };
+
+      if (replaceId && layouts.length === 1) {
+        await supabase.from("posts").update(postData).eq("id", replaceId);
+      } else {
+        await supabase.from("posts").insert(postData);
+      }
+
+      results.push({ layout: idx, status: "ok" });
+    } catch (e: any) {
+      results.push({ layout: idx, status: "error", message: e.message });
+    }
+  }
+
+  return NextResponse.json({ results });
+}
