@@ -8,10 +8,20 @@ const CONTENT_PROMPTS = [
   "Create a post showcasing a specific product feature with its clinical benefit.",
 ];
 
-async function generateContent(brandName: string, prompt: string, needsSubtitle: boolean) {
+async function generateContent(
+  brandName: string,
+  prompt: string,
+  needsSubtitle: boolean,
+  usedTopics: string[]
+) {
   const subtitleField = needsSubtitle
     ? '  "subtitle": "short secondary phrase (max 10 words)",\n'
     : "";
+
+  const topicsBlock =
+    usedTopics.length > 0
+      ? `\n\nTEMAS YA USADOS (no repetir, genera un tema completamente diferente):\n- ${usedTopics.join("\n- ")}`
+      : "";
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -27,7 +37,7 @@ async function generateContent(brandName: string, prompt: string, needsSubtitle:
       messages: [
         {
           role: "user",
-          content: `${prompt}\n\nRespond ONLY with valid JSON:\n{\n  "title": "short image text (max 6 words)",\n${subtitleField}  "caption": "full caption (max 280 chars)",\n  "hashtags": "#relevant #hashtags"\n}`,
+          content: `${prompt}${topicsBlock}\n\nRespond ONLY with valid JSON:\n{\n  "title": "short image text (max 6 words)",\n${subtitleField}  "caption": "full caption (max 280 chars)",\n  "hashtags": "#relevant #hashtags"\n}`,
         },
       ],
     }),
@@ -54,7 +64,6 @@ async function getNextScheduledDate(
   brandId: string,
   supabase: any
 ): Promise<string> {
-  // Get existing scheduled posts to avoid double-booking
   const { data: existing } = await supabase
     .from("posts")
     .select("scheduled_at")
@@ -70,12 +79,10 @@ async function getNextScheduledDate(
   const [hours, minutes] = publishTime.split(":").map(Number);
   const now = new Date();
 
-  // Search up to 8 weeks ahead
   for (let offset = 0; offset < 56; offset++) {
     const candidate = new Date(now);
     candidate.setDate(candidate.getDate() + offset);
 
-    // JS getDay(): 0=Sun, we need 1=Mon..7=Sun
     const jsDay = candidate.getDay();
     const isoDay = jsDay === 0 ? 7 : jsDay;
 
@@ -84,11 +91,9 @@ async function getNextScheduledDate(
     const dateStr = candidate.toISOString().split("T")[0];
     if (bookedDates.has(dateStr)) continue;
 
-    // Build the datetime string in the brand's timezone
     const pad = (n: number) => String(n).padStart(2, "0");
     const localDatetime = `${dateStr}T${pad(hours)}:${pad(minutes)}:00`;
 
-    // Convert to UTC using the timezone offset
     const inTz = new Date(
       new Date(localDatetime).toLocaleString("en-US", { timeZone: timezone })
     );
@@ -100,7 +105,6 @@ async function getNextScheduledDate(
     return utcDate.toISOString();
   }
 
-  // Fallback: tomorrow at publish time
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const dateStr = tomorrow.toISOString().split("T")[0];
@@ -127,10 +131,25 @@ export async function POST(request: Request) {
   const idx = layout ?? 0;
   const needsSubtitle = idx === 1 || idx === 2;
 
-  try {
-    const content = await generateContent(brand.name, CONTENT_PROMPTS[idx], needsSubtitle);
+  // Fetch last 20 used topics to avoid repetition
+  const { data: topicRows } = await supabase
+    .from("post_topics")
+    .select("topic")
+    .eq("brand_id", brandId)
+    .order("used_at", { ascending: false })
+    .limit(20);
 
-    // Calculate next scheduled_at based on brand frequency settings
+  const usedTopics = (topicRows ?? []).map((r: any) => r.topic);
+
+  try {
+    const content = await generateContent(brand.name, CONTENT_PROMPTS[idx], needsSubtitle, usedTopics);
+
+    // Save the new topic for future deduplication
+    const topic = content.title || content.caption?.slice(0, 60) || "";
+    if (topic) {
+      await supabase.from("post_topics").insert({ brand_id: brandId, topic });
+    }
+
     const scheduledAt = getNextScheduledDate(
       brand.preferred_days ?? [1],
       brand.publish_time ?? "09:00",
