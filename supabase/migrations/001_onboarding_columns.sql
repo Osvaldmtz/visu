@@ -3,6 +3,8 @@ ALTER TABLE brands ADD COLUMN IF NOT EXISTS secondary_color text;
 ALTER TABLE brands ADD COLUMN IF NOT EXISTS font_family text default 'Inter';
 ALTER TABLE brands ADD COLUMN IF NOT EXISTS active_layouts int[] default '{0,1,2,3}';
 ALTER TABLE brands ADD COLUMN IF NOT EXISTS logo_storage_path text;
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS logo_light_url text;
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS logo_dark_url text;
 
 -- Storage: create logos bucket (run only if not already created via API)
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', true) ON CONFLICT DO NOTHING;

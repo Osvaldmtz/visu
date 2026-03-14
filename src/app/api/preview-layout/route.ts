@@ -28,8 +28,13 @@ export async function POST(request: Request) {
       title: { text: SAMPLE_TITLES[layoutId] },
     };
 
-    if (brandConfig.logoUrl) {
-      layers.logo = { image_url: brandConfig.logoUrl };
+    // Layouts 0,1 (dark bg) → light logo; Layouts 2,3 (light bg) → dark logo with fallback
+    const logoUrl =
+      layoutId <= 1
+        ? brandConfig.logoLightUrl || brandConfig.logoUrl
+        : brandConfig.logoDarkUrl || brandConfig.logoLightUrl || brandConfig.logoUrl;
+    if (logoUrl) {
+      layers.logo = { image_url: logoUrl };
     }
 
     if (brandConfig.primaryColor) {

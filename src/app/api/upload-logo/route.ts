@@ -15,10 +15,18 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   const brandId = formData.get("brandId") as string | null;
+  const variant = (formData.get("variant") as string) || "light";
 
   if (!file || !brandId) {
     return NextResponse.json(
       { error: "file and brandId are required" },
+      { status: 400 }
+    );
+  }
+
+  if (variant !== "light" && variant !== "dark") {
+    return NextResponse.json(
+      { error: "variant must be 'light' or 'dark'" },
       { status: 400 }
     );
   }
@@ -36,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   const ext = file.name.split(".").pop() || "png";
-  const storagePath = `${brandId}/logo.${ext}`;
+  const storagePath = `${brandId}/logo-${variant}.${ext}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -58,11 +66,12 @@ export async function POST(request: Request) {
     data: { publicUrl },
   } = supabase.storage.from("logos").getPublicUrl(storagePath);
 
-  // Update brand with the storage path
+  // Update brand with the appropriate logo URL column
+  const updateField = variant === "light" ? "logo_light_url" : "logo_dark_url";
   await supabase
     .from("brands")
-    .update({ logo_storage_path: storagePath, logo_url: publicUrl })
+    .update({ [updateField]: publicUrl, logo_storage_path: storagePath })
     .eq("id", brandId);
 
-  return NextResponse.json({ storagePath, publicUrl });
+  return NextResponse.json({ variant, storagePath, publicUrl });
 }

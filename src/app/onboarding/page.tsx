@@ -41,8 +41,10 @@ export default function OnboardingPage() {
 
   // Step 1 — Brand
   const [brandName, setBrandName] = useState("");
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoLightFile, setLogoLightFile] = useState<File | null>(null);
+  const [logoLightPreview, setLogoLightPreview] = useState<string | null>(null);
+  const [logoDarkFile, setLogoDarkFile] = useState<File | null>(null);
+  const [logoDarkPreview, setLogoDarkPreview] = useState<string | null>(null);
   const [primaryColor, setPrimaryColor] = useState("#7C3DE3");
   const [secondaryColor, setSecondaryColor] = useState("#1a1a1a");
   const [font, setFont] = useState("Inter");
@@ -60,20 +62,29 @@ export default function OnboardingPage() {
   const [fbPage, setFbPage] = useState("");
   const [lateApiKey, setLateApiKey] = useState("");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const lightInputRef = useRef<HTMLInputElement>(null);
+  const darkInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoSelect = useCallback((file: File) => {
-    setLogoFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setLogoPreview(reader.result as string);
-    reader.readAsDataURL(file);
-  }, []);
+  const handleLogoSelect = useCallback(
+    (file: File, variant: "light" | "dark") => {
+      const reader = new FileReader();
+      if (variant === "light") {
+        setLogoLightFile(file);
+        reader.onloadend = () => setLogoLightPreview(reader.result as string);
+      } else {
+        setLogoDarkFile(file);
+        reader.onloadend = () => setLogoDarkPreview(reader.result as string);
+      }
+      reader.readAsDataURL(file);
+    },
+    []
+  );
 
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    (e: React.DragEvent, variant: "light" | "dark") => {
       e.preventDefault();
       const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith("image/")) handleLogoSelect(file);
+      if (file && file.type.startsWith("image/")) handleLogoSelect(file, variant);
     },
     [handleLogoSelect]
   );
@@ -97,7 +108,7 @@ export default function OnboardingPage() {
   };
 
   const canAdvance = () => {
-    if (step === 1) return brandName.trim().length > 0;
+    if (step === 1) return brandName.trim().length > 0 && logoLightFile !== null;
     if (step === 2)
       return Object.values(activeLayouts).some((v) => v);
     return true;
@@ -143,14 +154,16 @@ export default function OnboardingPage() {
             <StepBrand
               brandName={brandName}
               setBrandName={setBrandName}
-              logoPreview={logoPreview}
+              logoLightPreview={logoLightPreview}
+              logoDarkPreview={logoDarkPreview}
               primaryColor={primaryColor}
               setPrimaryColor={setPrimaryColor}
               secondaryColor={secondaryColor}
               setSecondaryColor={setSecondaryColor}
               font={font}
               setFont={setFont}
-              fileInputRef={fileInputRef}
+              lightInputRef={lightInputRef}
+              darkInputRef={darkInputRef}
               onLogoSelect={handleLogoSelect}
               onDrop={handleDrop}
             />
@@ -175,7 +188,8 @@ export default function OnboardingPage() {
           {step === 4 && (
             <StepConfirm
               brandName={brandName}
-              logoPreview={logoPreview}
+              logoLightPreview={logoLightPreview}
+              logoDarkPreview={logoDarkPreview}
               primaryColor={primaryColor}
               secondaryColor={secondaryColor}
               font={font}
@@ -226,32 +240,100 @@ export default function OnboardingPage() {
 
 /* ─── Step 1: Brand ─── */
 
+function LogoDropZone({
+  preview,
+  label,
+  hint,
+  bgColor,
+  inputRef,
+  onSelect,
+  onDrop,
+}: {
+  preview: string | null;
+  label: string;
+  hint: string;
+  bgColor: string;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onSelect: (file: File) => void;
+  onDrop: (e: React.DragEvent) => void;
+}) {
+  return (
+    <div
+      onDrop={onDrop}
+      onDragOver={(e) => e.preventDefault()}
+      onClick={() => inputRef.current?.click()}
+      className="border-2 border-dashed border-surface-border hover:border-accent/50 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer transition-colors min-h-[140px]"
+      style={{ backgroundColor: bgColor }}
+    >
+      {preview ? (
+        <img
+          src={preview}
+          alt={label}
+          className="max-h-20 max-w-full object-contain"
+        />
+      ) : (
+        <>
+          <svg
+            className="w-7 h-7 text-neutral-500 mb-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 16v-8m0 0l-3 3m3-3l3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1"
+            />
+          </svg>
+          <span className="text-neutral-400 text-sm">{label}</span>
+          <span className="text-neutral-600 text-xs mt-1">{hint}</span>
+        </>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onSelect(file);
+        }}
+      />
+    </div>
+  );
+}
+
 function StepBrand({
   brandName,
   setBrandName,
-  logoPreview,
+  logoLightPreview,
+  logoDarkPreview,
   primaryColor,
   setPrimaryColor,
   secondaryColor,
   setSecondaryColor,
   font,
   setFont,
-  fileInputRef,
+  lightInputRef,
+  darkInputRef,
   onLogoSelect,
   onDrop,
 }: {
   brandName: string;
   setBrandName: (v: string) => void;
-  logoPreview: string | null;
+  logoLightPreview: string | null;
+  logoDarkPreview: string | null;
   primaryColor: string;
   setPrimaryColor: (v: string) => void;
   secondaryColor: string;
   setSecondaryColor: (v: string) => void;
   font: string;
   setFont: (v: string) => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  onLogoSelect: (file: File) => void;
-  onDrop: (e: React.DragEvent) => void;
+  lightInputRef: React.RefObject<HTMLInputElement | null>;
+  darkInputRef: React.RefObject<HTMLInputElement | null>;
+  onLogoSelect: (file: File, variant: "light" | "dark") => void;
+  onDrop: (e: React.DragEvent, variant: "light" | "dark") => void;
 }) {
   return (
     <div className="space-y-6">
@@ -272,55 +354,31 @@ function StepBrand({
         />
       </Field>
 
-      {/* Logo upload */}
-      <Field label="Logo">
-        <div
-          onDrop={onDrop}
-          onDragOver={(e) => e.preventDefault()}
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-surface-border hover:border-accent/50 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors min-h-[140px]"
-        >
-          {logoPreview ? (
-            <img
-              src={logoPreview}
-              alt="Logo preview"
-              className="max-h-24 max-w-full object-contain"
-            />
-          ) : (
-            <>
-              <svg
-                className="w-8 h-8 text-neutral-500 mb-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M12 16v-8m0 0l-3 3m3-3l3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1"
-                />
-              </svg>
-              <span className="text-neutral-400 text-sm">
-                Arrastra tu logo o haz clic para seleccionar
-              </span>
-              <span className="text-neutral-600 text-xs mt-1">
-                PNG, JPG o SVG
-              </span>
-            </>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onLogoSelect(file);
-            }}
+      {/* Logo uploads */}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Logo claro" required>
+          <LogoDropZone
+            preview={logoLightPreview}
+            label="Para fondos oscuros"
+            hint="PNG o SVG (blanco)"
+            bgColor="#1a1a1a"
+            inputRef={lightInputRef}
+            onSelect={(f) => onLogoSelect(f, "light")}
+            onDrop={(e) => onDrop(e, "light")}
           />
-        </div>
-      </Field>
+        </Field>
+        <Field label="Logo oscuro">
+          <LogoDropZone
+            preview={logoDarkPreview}
+            label="Para fondos claros"
+            hint="PNG o SVG (oscuro)"
+            bgColor="#e5e5e5"
+            inputRef={darkInputRef}
+            onSelect={(f) => onLogoSelect(f, "dark")}
+            onDrop={(e) => onDrop(e, "dark")}
+          />
+        </Field>
+      </div>
 
       {/* Colors */}
       <div className="grid grid-cols-2 gap-4">
@@ -333,7 +391,7 @@ function StepBrand({
       </div>
 
       {/* Font */}
-      <Field label="Tipografía">
+      <Field label="Tipografia">
         <select value={font} onChange={(e) => setFont(e.target.value)}>
           {FONTS.map((f) => (
             <option key={f} value={f}>
@@ -474,7 +532,8 @@ function StepSocial({
 
 function StepConfirm({
   brandName,
-  logoPreview,
+  logoLightPreview,
+  logoDarkPreview,
   primaryColor,
   secondaryColor,
   font,
@@ -484,7 +543,8 @@ function StepConfirm({
   lateApiKey,
 }: {
   brandName: string;
-  logoPreview: string | null;
+  logoLightPreview: string | null;
+  logoDarkPreview: string | null;
   primaryColor: string;
   secondaryColor: string;
   font: string;
@@ -507,25 +567,33 @@ function StepConfirm({
       {/* Brand preview card */}
       <div className="rounded-xl border border-surface-border bg-surface-light p-6">
         <div className="flex items-center gap-4 mb-6">
-          {logoPreview ? (
-            <div
-              className="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden"
-              style={{ backgroundColor: secondaryColor }}
-            >
-              <img
-                src={logoPreview}
-                alt="Logo"
-                className="max-w-[48px] max-h-[48px] object-contain"
-              />
-            </div>
-          ) : (
-            <div
-              className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold text-white"
-              style={{ backgroundColor: primaryColor }}
-            >
-              {brandName.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <div className="flex gap-2">
+            {logoLightPreview ? (
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden bg-[#1a1a1a]">
+                <img
+                  src={logoLightPreview}
+                  alt="Logo claro"
+                  className="max-w-[40px] max-h-[40px] object-contain"
+                />
+              </div>
+            ) : (
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold text-white"
+                style={{ backgroundColor: primaryColor }}
+              >
+                {brandName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            {logoDarkPreview && (
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden bg-[#e5e5e5]">
+                <img
+                  src={logoDarkPreview}
+                  alt="Logo oscuro"
+                  className="max-w-[40px] max-h-[40px] object-contain"
+                />
+              </div>
+            )}
+          </div>
           <div>
             <h2 className="text-lg font-bold text-white">{brandName}</h2>
             <p className="text-neutral-400 text-sm" style={{ fontFamily: font }}>

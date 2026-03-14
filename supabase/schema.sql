@@ -6,6 +6,8 @@ create table brands (
   user_id uuid references auth.users not null,
   name text not null,
   logo_url text,
+  logo_light_url text,
+  logo_dark_url text,
   primary_color text default '#7C3DE3',
   industry text,
   ig_handle text,

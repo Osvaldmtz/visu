@@ -137,10 +137,11 @@ export async function POST(request: Request) {
         title: { text: content.title, font_family: fontFamily, color: primaryColor },
       };
 
-      // Prefer logo from storage, fall back to logo_url
-      const logoUrl = brand.logo_storage_path
-        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/logos/${brand.logo_storage_path}`
-        : brand.logo_url;
+      // Layouts 0,1 (dark bg) → light logo; Layouts 2,3 (light bg) → dark logo with fallback
+      const logoUrl =
+        idx <= 1
+          ? brand.logo_light_url || brand.logo_url
+          : brand.logo_dark_url || brand.logo_light_url || brand.logo_url;
       if (logoUrl) {
         layers.logo = { image_url: logoUrl };
       }
