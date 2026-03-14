@@ -11,6 +11,10 @@ create table brands (
   ig_handle text,
   fb_page text,
   late_api_key text,
+  secondary_color text,
+  font_family text default 'Inter',
+  active_layouts int[] default '{0,1,2,3}',
+  logo_storage_path text,
   created_at timestamp with time zone default now()
 );
 

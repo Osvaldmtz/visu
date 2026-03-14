@@ -3,12 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 
 const LAYOUT_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
 
-const FAL_PROMPTS = [
-  "Pure deep purple gradient background, smooth bokeh light spots, no objects no people no text, minimal abstract",
-  "Soft purple gradient, subtle light leak, no objects no people no text, clean abstract",
-  null,
-  null,
-];
+function buildFalPrompts(primaryColor: string): (string | null)[] {
+  return [
+    `Pure deep ${primaryColor} gradient background, smooth bokeh light spots, no objects no people no text, minimal abstract`,
+    `Soft ${primaryColor} gradient, subtle light leak, no objects no people no text, clean abstract`,
+    null,
+    null,
+  ];
+}
 
 const CONTENT_PROMPTS = [
   "Create an educational post about a clinical assessment tool. Include a specific clinical statistic.",
@@ -105,7 +107,8 @@ export async function POST(request: Request) {
 
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
 
-  const layouts = singleLayout !== undefined ? [singleLayout] : [0, 1, 2, 3];
+  const allLayouts = brand.active_layouts ?? [0, 1, 2, 3];
+  const layouts = singleLayout !== undefined ? [singleLayout] : allLayouts;
   const templateIds = [
     process.env.TEMPLATED_TEMPLATE_0!,
     process.env.TEMPLATED_TEMPLATE_1!,
@@ -123,16 +126,26 @@ export async function POST(request: Request) {
         idx === 1 || idx === 2
       );
 
-      const falPrompt = FAL_PROMPTS[idx];
+      const falPrompts = buildFalPrompts(brand.primary_color ?? "#7C3DE3");
+      const falPrompt = falPrompts[idx];
       const bgUrl = falPrompt ? await generateFalBackground(falPrompt) : null;
 
-      const layers: Record<string, any> = { title: { text: content.title } };
+      const fontFamily = brand.font_family ?? "Inter";
+      const primaryColor = brand.primary_color ?? "#7C3DE3";
 
-      if (brand.logo_url) {
-        layers.logo = { image_url: brand.logo_url };
+      const layers: Record<string, any> = {
+        title: { text: content.title, font_family: fontFamily, color: primaryColor },
+      };
+
+      // Prefer logo from storage, fall back to logo_url
+      const logoUrl = brand.logo_storage_path
+        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/logos/${brand.logo_storage_path}`
+        : brand.logo_url;
+      if (logoUrl) {
+        layers.logo = { image_url: logoUrl };
       }
       if (content.subtitle) {
-        layers.subtitle = { text: content.subtitle };
+        layers.subtitle = { text: content.subtitle, font_family: fontFamily };
       }
       if (bgUrl) {
         layers.background = { image_url: bgUrl };
