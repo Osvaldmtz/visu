@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export const maxDuration = 30;
 
@@ -11,6 +12,7 @@ export async function POST(request: Request) {
   const title = formData.get("title") as string;
   const caption = formData.get("caption") as string;
   const postId = formData.get("postId") as string | null;
+  const scheduledAt = formData.get("scheduled_at") as string | null;
 
   if (!file || !brandId) {
     return NextResponse.json({ error: "Missing file or brandId" }, { status: 400 });
@@ -30,12 +32,18 @@ export async function POST(request: Request) {
 
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
 
+  // Use service role client for storage upload (bypasses RLS)
+  const adminClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   // Upload PNG to Supabase Storage
   const fileName = `${brandId}/${Date.now()}-layout${layout}.png`;
   const arrayBuffer = await file.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await adminClient.storage
     .from("posts")
     .upload(fileName, buffer, {
       contentType: "image/png",
@@ -44,14 +52,14 @@ export async function POST(request: Request) {
 
   if (uploadError) {
     console.error("Upload error:", uploadError);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 500 });
   }
 
-  const { data: { publicUrl } } = supabase.storage
+  const { data: { publicUrl } } = adminClient.storage
     .from("posts")
     .getPublicUrl(fileName);
 
-  const postData = {
+  const postData: Record<string, any> = {
     brand_id: brandId,
     layout: parseInt(layout),
     image_url: publicUrl,
@@ -59,6 +67,10 @@ export async function POST(request: Request) {
     title: title || "",
     status: "APPROVED",
   };
+
+  if (scheduledAt) {
+    postData.scheduled_at = scheduledAt;
+  }
 
   if (postId) {
     const { error } = await supabase.from("posts").update(postData).eq("id", postId);

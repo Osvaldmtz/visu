@@ -52,6 +52,7 @@ export default function TemplateEditor({
   const [photoQuery, setPhotoQuery] = useState("");
   const [photoResults, setPhotoResults] = useState<any[]>([]);
   const [searchingPhotos, setSearchingPhotos] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
 
   // Pick the right logo variant based on layout
   const logoUrl =
@@ -79,6 +80,7 @@ export default function TemplateEditor({
       if (data.title) setTitle(data.title);
       if (data.subtitle) setSubtitle(data.subtitle);
       if (data.caption) setCaption(data.caption);
+      if (data.scheduled_at) setScheduledAt(data.scheduled_at);
     } finally {
       setGenerating(false);
     }
@@ -139,6 +141,7 @@ export default function TemplateEditor({
       formData.append("title", title);
       formData.append("caption", caption);
       if (postId) formData.append("postId", postId);
+      if (scheduledAt) formData.append("scheduled_at", scheduledAt);
 
       const res = await fetch("/api/approve-post", {
         method: "POST",
