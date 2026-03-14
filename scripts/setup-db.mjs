@@ -15,7 +15,7 @@ const statements = [
     industry text,
     ig_handle text,
     fb_page text,
-    late_api_key text,
+    tiktok_handle text,
     created_at timestamp with time zone default now()
   )`,
   `create table if not exists posts (

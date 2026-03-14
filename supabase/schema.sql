@@ -12,7 +12,7 @@ create table brands (
   industry text,
   ig_handle text,
   fb_page text,
-  late_api_key text,
+  tiktok_handle text,
   secondary_color text,
   font_family text default 'Inter',
   active_layouts int[] default '{0,1,2,3}',
@@ -33,9 +33,19 @@ create table posts (
   created_at timestamp with time zone default now()
 );
 
+create table brand_social_accounts (
+  id uuid primary key default gen_random_uuid(),
+  brand_id uuid references brands not null,
+  platform text not null,
+  account_id text,
+  handle text,
+  created_at timestamp with time zone default now()
+);
+
 -- RLS policies
 alter table brands enable row level security;
 alter table posts enable row level security;
+alter table brand_social_accounts enable row level security;
 
 create policy "Users can manage their brands"
   on brands for all
@@ -45,7 +55,12 @@ create policy "Users can manage their posts"
   on posts for all
   using (brand_id in (select id from brands where user_id = auth.uid()));
 
+create policy "Users can manage their social accounts"
+  on brand_social_accounts for all
+  using (brand_id in (select id from brands where user_id = auth.uid()));
+
 -- Indexes
 create index idx_brands_user on brands(user_id);
 create index idx_posts_brand on posts(brand_id);
 create index idx_posts_status on posts(status);
+create index idx_social_brand on brand_social_accounts(brand_id);

@@ -3,6 +3,29 @@ import { createClient } from "@/lib/supabase/server";
 
 const LAYOUT_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
 
+// Late API — server-side key, account IDs mapped per brand
+async function getLateAccountIds(supabase: any, brandId: string, igHandle: string | null) {
+  // Hardcoded mapping for Kalyo
+  if (igHandle === "@kalyo_app" || igHandle === "kalyo_app") {
+    return {
+      ig: process.env.LATE_IG_ACCOUNT_ID ?? null,
+      fb: process.env.LATE_FB_ACCOUNT_ID ?? null,
+    };
+  }
+  // Look up from brand_social_accounts table
+  const { data: accounts } = await supabase
+    .from("brand_social_accounts")
+    .select("platform, account_id")
+    .eq("brand_id", brandId);
+
+  const map: Record<string, string | null> = { ig: null, fb: null };
+  for (const acc of accounts ?? []) {
+    if (acc.platform === "instagram") map.ig = acc.account_id;
+    if (acc.platform === "facebook") map.fb = acc.account_id;
+  }
+  return map;
+}
+
 function buildFalPrompts(primaryColor: string): (string | null)[] {
   return [
     `Pure deep ${primaryColor} gradient background, smooth bokeh light spots, no objects no people no text, minimal abstract`,

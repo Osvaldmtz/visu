@@ -60,7 +60,7 @@ export default function OnboardingPage() {
   // Step 3 — Social
   const [igHandle, setIgHandle] = useState("");
   const [fbPage, setFbPage] = useState("");
-  const [lateApiKey, setLateApiKey] = useState("");
+  const [tiktokHandle, setTiktokHandle] = useState("");
 
   const lightInputRef = useRef<HTMLInputElement>(null);
   const darkInputRef = useRef<HTMLInputElement>(null);
@@ -181,8 +181,8 @@ export default function OnboardingPage() {
               setIgHandle={setIgHandle}
               fbPage={fbPage}
               setFbPage={setFbPage}
-              lateApiKey={lateApiKey}
-              setLateApiKey={setLateApiKey}
+              tiktokHandle={tiktokHandle}
+              setTiktokHandle={setTiktokHandle}
             />
           )}
           {step === 4 && (
@@ -196,7 +196,7 @@ export default function OnboardingPage() {
               activeLayouts={activeLayouts}
               igHandle={igHandle}
               fbPage={fbPage}
-              lateApiKey={lateApiKey}
+              tiktokHandle={tiktokHandle}
             />
           )}
         </div>
@@ -473,22 +473,23 @@ function StepSocial({
   setIgHandle,
   fbPage,
   setFbPage,
-  lateApiKey,
-  setLateApiKey,
+  tiktokHandle,
+  setTiktokHandle,
 }: {
   igHandle: string;
   setIgHandle: (v: string) => void;
   fbPage: string;
   setFbPage: (v: string) => void;
-  lateApiKey: string;
-  setLateApiKey: (v: string) => void;
+  tiktokHandle: string;
+  setTiktokHandle: (v: string) => void;
 }) {
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold mb-1">Redes sociales</h1>
         <p className="text-neutral-400 text-sm">
-          Conecta tus cuentas para publicación automática.
+          Visu publicará automáticamente en tus cuentas. Nos contactaremos para
+          completar la conexión.
         </p>
       </div>
 
@@ -510,20 +511,14 @@ function StepSocial({
         />
       </Field>
 
-      <div>
-        <Field label="Late API key">
-          <input
-            type="password"
-            value={lateApiKey}
-            onChange={(e) => setLateApiKey(e.target.value)}
-            placeholder="sk_..."
-          />
-        </Field>
-        <p className="text-neutral-500 text-xs mt-2">
-          Obtén tu key en{" "}
-          <span className="text-accent">late.media/settings</span>
-        </p>
-      </div>
+      <Field label="TikTok handle (opcional)">
+        <input
+          type="text"
+          value={tiktokHandle}
+          onChange={(e) => setTiktokHandle(e.target.value)}
+          placeholder="@tu_marca"
+        />
+      </Field>
     </div>
   );
 }
@@ -540,7 +535,7 @@ function StepConfirm({
   activeLayouts,
   igHandle,
   fbPage,
-  lateApiKey,
+  tiktokHandle,
 }: {
   brandName: string;
   logoLightPreview: string | null;
@@ -551,7 +546,7 @@ function StepConfirm({
   activeLayouts: Record<string, boolean>;
   igHandle: string;
   fbPage: string;
-  lateApiKey: string;
+  tiktokHandle: string;
 }) {
   const enabledLayouts = LAYOUTS.filter((l) => activeLayouts[l.id]);
 
@@ -645,8 +640,8 @@ function StepConfirm({
           <div className="mt-2 space-y-1 text-sm text-neutral-300">
             {igHandle && <p>Instagram: {igHandle}</p>}
             {fbPage && <p>Facebook: {fbPage}</p>}
-            {lateApiKey && <p>Late API: ****{lateApiKey.slice(-4)}</p>}
-            {!igHandle && !fbPage && !lateApiKey && (
+            {tiktokHandle && <p>TikTok: {tiktokHandle}</p>}
+            {!igHandle && !fbPage && !tiktokHandle && (
               <p className="text-neutral-500">No configurado</p>
             )}
           </div>
