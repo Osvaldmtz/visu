@@ -98,15 +98,15 @@ async function generateFalBackground(prompt: string): Promise<string | null> {
     }
     const { response_url } = body;
 
-    for (let i = 0; i < 20; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, i < 3 ? 1000 : 2000));
       const poll = await fetch(response_url, {
         headers: { Authorization: `Key ${process.env.FAL_KEY}` },
       });
       const data = await poll.json();
       if (data.images) return data.images[0].url;
     }
-    console.error("FAL polling timed out after 60s");
+    console.error("FAL polling timed out");
     return null;
   } catch (e: any) {
     console.error("FAL error:", e.message);
@@ -134,6 +134,8 @@ async function renderImage(
   return data.render_url;
 }
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const { brandId, layout: singleLayout, replaceId } = await request.json();
 
@@ -153,7 +155,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Brand not found" }, { status: 404 });
   }
 
-  const layouts = singleLayout !== undefined ? [singleLayout] : [0];
+  const allLayouts = brand.active_layouts ?? [0, 1, 2, 3];
+  const layouts = singleLayout !== undefined ? [singleLayout] : allLayouts;
   const templateIds = [
     process.env.TEMPLATED_TEMPLATE_0!,
     process.env.TEMPLATED_TEMPLATE_1!,
