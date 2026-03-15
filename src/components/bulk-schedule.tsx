@@ -19,32 +19,48 @@ interface Brand {
 
 const DAY_NAMES = ["", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 const MONTH_NAMES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const TIME_SLOTS = ["08:00", "12:00", "18:00"];
+
+// Optimal posting times per ISO day (1=Mon..7=Sun)
+const OPTIMAL_TIMES: Record<number, string> = {
+  1: "08:00", // Lunes
+  2: "08:00", // Martes
+  3: "13:00", // Miercoles
+  4: "08:00", // Jueves
+  5: "18:00", // Viernes
+  6: "10:00", // Sabado
+  7: "20:00", // Domingo
+};
+
+interface ScheduleItem {
+  postId: string;
+  title: string;
+  date: string;
+  time: string;
+  dayName: string;
+}
 
 function computeSchedule(
   posts: Post[],
   preferredDays: number[],
-  publishTime: string,
   existingScheduled: Post[]
-): { postId: string; title: string; date: string; time: string }[] {
+): ScheduleItem[] {
   const days = preferredDays.length > 0 ? preferredDays : [1];
-  const baseTime = (publishTime || "09:00").slice(0, 5);
 
-  // Collect already booked dates
   const bookedDates = new Map<string, number>();
   for (const p of existingScheduled) {
     if (p.scheduled_at) {
-      const d = new Date(p.scheduled_at).toISOString().split("T")[0];
-      bookedDates.set(d, (bookedDates.get(d) ?? 0) + 1);
+      try {
+        const d = new Date(p.scheduled_at).toISOString().split("T")[0];
+        bookedDates.set(d, (bookedDates.get(d) ?? 0) + 1);
+      } catch { /* skip */ }
     }
   }
 
-  const schedule: { postId: string; title: string; date: string; time: string }[] = [];
+  const schedule: ScheduleItem[] = [];
   const now = new Date();
   let dayOffset = 1;
 
   for (const post of posts) {
-    // Find next available preferred day
     while (dayOffset < 120) {
       const candidate = new Date(now);
       candidate.setDate(candidate.getDate() + dayOffset);
@@ -55,14 +71,17 @@ function computeSchedule(
         const dateStr = candidate.toISOString().split("T")[0];
         const count = bookedDates.get(dateStr) ?? 0;
 
-        // Allow up to 3 posts per day with varied times
-        if (count < 3) {
-          const time = count === 0 ? baseTime : TIME_SLOTS[count] ?? baseTime;
-          schedule.push({ postId: post.id, title: post.title, date: dateStr, time });
+        if (count < 1) {
+          const time = OPTIMAL_TIMES[isoDay] ?? "09:00";
+          schedule.push({
+            postId: post.id,
+            title: post.title,
+            date: dateStr,
+            time,
+            dayName: DAY_NAMES[isoDay],
+          });
           bookedDates.set(dateStr, count + 1);
-
-          // Move to next day for the next post
-          if (count >= 0) dayOffset++;
+          dayOffset++;
           break;
         }
       }
@@ -82,7 +101,7 @@ function formatDate(dateStr: string): string {
 
 export default function BulkSchedule({ posts, brand }: { posts: Post[]; brand: Brand }) {
   const router = useRouter();
-  const [preview, setPreview] = useState<{ postId: string; title: string; date: string; time: string }[] | null>(null);
+  const [preview, setPreview] = useState<ScheduleItem[] | null>(null);
   const [applying, setApplying] = useState(false);
 
   const unscheduledApproved = posts.filter(
@@ -93,14 +112,15 @@ export default function BulkSchedule({ posts, brand }: { posts: Post[]; brand: B
   if (unscheduledApproved.length === 0) return null;
 
   const handlePreview = () => {
-    const time = (brand.publish_time || "09:00").slice(0, 5);
-    const schedule = computeSchedule(
-      unscheduledApproved,
-      brand.preferred_days ?? [1],
-      time,
-      scheduledPosts
-    );
+    const schedule = computeSchedule(unscheduledApproved, brand.preferred_days ?? [1], scheduledPosts);
     setPreview(schedule);
+  };
+
+  const updateTime = (idx: number, time: string) => {
+    if (!preview) return;
+    const updated = [...preview];
+    updated[idx] = { ...updated[idx], time };
+    setPreview(updated);
   };
 
   const handleConfirm = async () => {
@@ -127,13 +147,20 @@ export default function BulkSchedule({ posts, brand }: { posts: Post[]; brand: B
         <h3 className="text-sm font-semibold text-white mb-3">
           Programacion propuesta ({preview.length} posts)
         </h3>
-        <div className="space-y-1.5 mb-4 max-h-48 overflow-y-auto">
-          {preview.map((item) => (
-            <div key={item.postId} className="flex items-center gap-3 text-sm">
-              <span className="text-blue-400 font-medium min-w-[110px]">
-                {formatDate(item.date)} · {item.time}
+        <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
+          {preview.map((item, idx) => (
+            <div key={item.postId} className="flex items-center gap-2 text-sm">
+              <span className="text-blue-400 font-medium min-w-[90px] text-xs">
+                {formatDate(item.date)}
               </span>
-              <span className="text-neutral-300 truncate">{item.title}</span>
+              <input
+                type="time"
+                value={item.time}
+                onChange={(e) => updateTime(idx, e.target.value)}
+                className="w-20 bg-surface border border-surface-border rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-accent"
+              />
+              <span className="text-neutral-300 truncate text-xs flex-1">{item.title}</span>
+              <span className="text-[10px] text-accent/60 shrink-0">Sugerido por IA</span>
             </div>
           ))}
         </div>

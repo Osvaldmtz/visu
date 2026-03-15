@@ -37,7 +37,7 @@ async function generateContent(
     : "";
 
   const bgField = needsBackground
-    ? '  "bg_prompt": "short english visual description for an abstract background image related to the topic (e.g. soft purple gradient with bokeh lights, clinical workspace with warm lighting)"\n'
+    ? `  "bg_prompt": "3-4 word Unsplash query in english for a psychology/therapy background photo. Use queries like: therapy office couch plant, psychologist desk notebook warm, counseling room minimal light, mental health consultation calm, therapist office natural light, mindfulness meditation peaceful, notebook pen psychology desk. NEVER use: doctor, hospital, medical, stethoscope, nurse, surgery, pills, medication, pharmacy, lab equipment."\n`
     : "";
 
   const topicsBlock =
