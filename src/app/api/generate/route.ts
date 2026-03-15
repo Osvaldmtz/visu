@@ -107,52 +107,53 @@ async function getNextScheduledDate(
   timezone: string,
   brandId: string,
   supabase: any
-): Promise<string> {
+): Promise<string | null> {
+  // Validate inputs
+  const days = Array.isArray(preferredDays) && preferredDays.length > 0 ? preferredDays : [1];
+  // Normalize publish_time — handle "09:00", "09:00:00", or null
+  const timeParts = (publishTime || "09:00").split(":");
+  const hours = parseInt(timeParts[0], 10) || 9;
+  const minutes = parseInt(timeParts[1], 10) || 0;
+
   const { data: existing } = await supabase
     .from("posts")
     .select("scheduled_at")
     .eq("brand_id", brandId)
     .not("scheduled_at", "is", null);
 
-  const bookedDates = new Set(
-    (existing ?? []).map((p: any) =>
-      new Date(p.scheduled_at).toISOString().split("T")[0]
-    )
-  );
+  const bookedDates = new Set<string>();
+  for (const p of existing ?? []) {
+    try {
+      bookedDates.add(new Date(p.scheduled_at).toISOString().split("T")[0]);
+    } catch { /* skip invalid dates */ }
+  }
 
-  const [hours, minutes] = publishTime.split(":").map(Number);
   const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
 
   for (let offset = 0; offset < 56; offset++) {
     const candidate = new Date(now);
     candidate.setDate(candidate.getDate() + offset);
 
+    // JS getDay(): 0=Sun → we use ISO 1=Mon..7=Sun
     const jsDay = candidate.getDay();
     const isoDay = jsDay === 0 ? 7 : jsDay;
 
-    if (!preferredDays.includes(isoDay)) continue;
+    if (!days.includes(isoDay)) continue;
 
     const dateStr = candidate.toISOString().split("T")[0];
     if (bookedDates.has(dateStr)) continue;
 
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const localDatetime = `${dateStr}T${pad(hours)}:${pad(minutes)}:00`;
-
-    const inTz = new Date(
-      new Date(localDatetime).toLocaleString("en-US", { timeZone: timezone })
-    );
-    const utcDate = new Date(
-      new Date(localDatetime).getTime() +
-        (new Date(localDatetime).getTime() - inTz.getTime())
-    );
-
-    return utcDate.toISOString();
+    // Build UTC datetime — use UTC directly (simple, reliable)
+    const utcStr = `${dateStr}T${pad(hours)}:${pad(minutes)}:00Z`;
+    return utcStr;
   }
 
+  // Fallback: tomorrow at publish time
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const dateStr = tomorrow.toISOString().split("T")[0];
-  return new Date(`${dateStr}T${publishTime}:00Z`).toISOString();
+  return `${dateStr}T${pad(hours)}:${pad(minutes)}:00Z`;
 }
 
 export const maxDuration = 60;

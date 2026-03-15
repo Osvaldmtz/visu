@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PostCard } from "@/components/post-card";
 import AutoGenerate from "@/components/auto-generate";
+import CleanupButton from "@/components/cleanup-button";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -26,6 +27,10 @@ export default async function DashboardPage() {
     .eq("brand_id", brand.id)
     .order("created_at", { ascending: false });
 
+  const cleanupCount = (posts ?? []).filter(
+    (p) => p.status === "DISCARDED" || !p.image_url
+  ).length;
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-surface-border px-6 py-4 flex items-center justify-between">
@@ -45,9 +50,12 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold">Content Grid</h1>
-            <p className="text-sm text-neutral-400 mt-1">
-              {posts?.length ?? 0} posts generated
-            </p>
+            <div className="flex items-center gap-4 mt-1">
+              <p className="text-sm text-neutral-400">
+                {posts?.length ?? 0} posts generated
+              </p>
+              <CleanupButton brandId={brand.id} count={cleanupCount} />
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Link
