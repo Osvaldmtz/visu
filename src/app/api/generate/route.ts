@@ -1,11 +1,30 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+const SYSTEM_PROMPT = `Eres el social media manager de Kalyo, una plataforma SaaS para PSICÓLOGOS CLÍNICOS en Latinoamérica. Kalyo permite gestionar pacientes, aplicar tests psicológicos digitales (PHQ-9, GAD-7, Beck, Hamilton, etc), generar reportes con IA y administrar la consulta.
+
+Audiencia: psicólogos clínicos 28-45 años, práctica privada o institucional en LATAM.
+
+Tono: clínico-profesional, empático, directo. Español latinoamericano neutro. Sin emojis excesivos.
+
+Temas válidos:
+- Tests psicológicos y su interpretación (PHQ-9, GAD-7, Beck, Hamilton, MMPI, Rorschach, WAIS, etc)
+- Documentación clínica y papeleo del psicólogo
+- Burnout del psicólogo clínico
+- Gestión de pacientes y citas
+- Evaluación psicológica y psicodiagnóstico
+- Features de Kalyo (reportes IA, tests digitales, expediente clínico)
+- Salud mental, terapia, psicoterapia
+
+Tagline: Evalúa más. Documenta menos. Trata mejor.
+
+NUNCA generar contenido sobre: medicina física, signos vitales, hospitales, UCI, cardiología, cirugía, enfermería, o cualquier especialidad médica que no sea psicología clínica.`;
+
 const CONTENT_PROMPTS = [
-  "Create an educational post about a clinical assessment tool. Include a specific clinical statistic.",
-  "Create a post showing time savings. Use concrete numbers contrasting before vs after.",
-  "Create a post that connects with professional burnout and documentation frustration.",
-  "Create a post showcasing a specific product feature with its clinical benefit.",
+  "Crea un post educativo sobre un test psicológico específico (PHQ-9, GAD-7, Beck, Hamilton, etc). Incluye un dato clínico real sobre su uso o validez.",
+  "Crea un post mostrando ahorro de tiempo para el psicólogo. Usa números concretos contrastando antes vs después de usar Kalyo para documentación o evaluación.",
+  "Crea un post que conecte con el burnout del psicólogo clínico: exceso de papeleo, notas clínicas, reportes manuales, falta de tiempo para pacientes.",
+  "Crea un post destacando una funcionalidad específica de Kalyo: tests digitales, reportes con IA, expediente clínico, o gestión de pacientes.",
 ];
 
 async function generateContent(
@@ -38,7 +57,7 @@ async function generateContent(
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
-      system: `You are the social media manager for ${brandName}. Write in professional Spanish (Latin American). Be concise and clinical.`,
+      system: SYSTEM_PROMPT,
       messages: [
         {
           role: "user",
