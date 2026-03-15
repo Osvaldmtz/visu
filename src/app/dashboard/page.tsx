@@ -97,22 +97,27 @@ export default async function DashboardPage({
             posts={posts ?? []}
             preferredDays={brand.preferred_days ?? [1]}
           />
-        ) : !posts?.length ? (
-          <div className="text-center py-20 border border-dashed border-surface-border rounded-xl">
-            <p className="text-neutral-400 mb-4">No posts yet</p>
-            <p className="text-sm text-neutral-500">
-              Click &quot;Generar parrilla&quot; to auto-generate your first post
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {posts.map((post) => (
-              <Link key={post.id} href={`/dashboard/post/${post.id}`}>
-                <PostCard post={post} />
-              </Link>
-            ))}
-          </div>
-        )}
+        ) : (() => {
+          const gridPosts = (posts ?? []).filter(
+            (p) => p.status !== "PUBLISHED" && p.status !== "DISCARDED"
+          );
+          return !gridPosts.length ? (
+            <div className="text-center py-20 border border-dashed border-surface-border rounded-xl">
+              <p className="text-neutral-400 mb-4">No posts yet</p>
+              <p className="text-sm text-neutral-500">
+                Click &quot;Generar parrilla&quot; to auto-generate your first post
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {gridPosts.map((post) => (
+                <Link key={post.id} href={`/dashboard/post/${post.id}`}>
+                  <PostCard post={post} />
+                </Link>
+              ))}
+            </div>
+          );
+        })()}
       </main>
     </div>
   );
