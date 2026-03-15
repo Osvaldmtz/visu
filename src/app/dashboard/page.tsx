@@ -4,8 +4,14 @@ import Link from "next/link";
 import { PostCard } from "@/components/post-card";
 import AutoGenerate from "@/components/auto-generate";
 import CleanupButton from "@/components/cleanup-button";
+import ViewToggle from "@/components/view-toggle";
+import CalendarView from "@/components/calendar-view";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { view?: string };
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -30,6 +36,8 @@ export default async function DashboardPage() {
   const cleanupCount = (posts ?? []).filter(
     (p) => p.status === "DISCARDED" || !p.image_url
   ).length;
+
+  const view = searchParams?.view ?? "grid";
 
   return (
     <div className="min-h-screen">
@@ -58,9 +66,10 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <ViewToggle />
             <Link
               href="/dashboard/editor"
-              className="bg-surface-light hover:bg-surface-border text-neutral-300 font-medium px-4 py-2.5 rounded-lg transition-colors text-sm border border-surface-border"
+              className="hidden sm:block bg-surface-light hover:bg-surface-border text-neutral-300 font-medium px-4 py-2.5 rounded-lg transition-colors text-sm border border-surface-border"
             >
               Crear manualmente
             </Link>
@@ -68,7 +77,12 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {!posts?.length ? (
+        {view === "calendar" ? (
+          <CalendarView
+            posts={posts ?? []}
+            preferredDays={brand.preferred_days ?? [1]}
+          />
+        ) : !posts?.length ? (
           <div className="text-center py-20 border border-dashed border-surface-border rounded-xl">
             <p className="text-neutral-400 mb-4">No posts yet</p>
             <p className="text-sm text-neutral-500">
