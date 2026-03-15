@@ -4,6 +4,8 @@ const nextConfig = {
     remotePatterns: [
       { hostname: "images.unsplash.com" },
       { hostname: "ariroiycjuferrlxidla.supabase.co" },
+      { hostname: "v3b.fal.media" },
+      { hostname: "fal.media" },
     ],
   },
 };

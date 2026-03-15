@@ -12,10 +12,15 @@ async function generateContent(
   brandName: string,
   prompt: string,
   needsSubtitle: boolean,
+  needsBackground: boolean,
   usedTopics: string[]
 ) {
   const subtitleField = needsSubtitle
     ? '  "subtitle": "short secondary phrase (max 10 words)",\n'
+    : "";
+
+  const bgField = needsBackground
+    ? '  "bg_prompt": "short english visual description for an abstract background image related to the topic (e.g. soft purple gradient with bokeh lights, clinical workspace with warm lighting)"\n'
     : "";
 
   const topicsBlock =
@@ -37,7 +42,7 @@ async function generateContent(
       messages: [
         {
           role: "user",
-          content: `${prompt}${topicsBlock}\n\nRespond ONLY with valid JSON:\n{\n  "title": "short image text (max 6 words)",\n${subtitleField}  "caption": "full caption (max 280 chars)",\n  "hashtags": "#relevant #hashtags",\n  "photo_query": "2-3 english keywords for a relevant background photo (professional, clinical, abstract)"\n}`,
+          content: `${prompt}${topicsBlock}\n\nRespond ONLY with valid JSON:\n{\n  "title": "short image text (max 6 words)",\n${subtitleField}  "caption": "full caption (max 280 chars)",\n  "hashtags": "#relevant #hashtags",\n${bgField}}`,
         },
       ],
     }),
@@ -57,23 +62,41 @@ async function generateContent(
   return JSON.parse(raw);
 }
 
-async function searchUnsplash(query: string): Promise<string | null> {
-  const key = process.env.UNSPLASH_ACCESS_KEY;
-  if (!key || !query) return null;
+async function generateFalBackground(bgPrompt: string, primaryColor: string): Promise<string | null> {
+  const falKey = process.env.FAL_KEY;
+  if (!falKey) return null;
+
+  const prompt = `${bgPrompt}, ${primaryColor} purple tones, no text, no people, no objects, professional, clean background, high quality`;
 
   try {
-    const res = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=squarish`,
-      { headers: { Authorization: `Client-ID ${key}` } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const results = data.results ?? [];
-    if (results.length === 0) return null;
-    // Pick a random photo from top 5
-    const photo = results[Math.floor(Math.random() * results.length)];
-    return photo.urls?.regular ?? null;
-  } catch {
+    const res = await fetch("https://queue.fal.run/fal-ai/flux/schnell", {
+      method: "POST",
+      headers: {
+        Authorization: `Key ${falKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt, image_size: "square_hd", num_images: 1 }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      console.error("FAL queue error:", res.status, JSON.stringify(body));
+      return null;
+    }
+    const { response_url } = body;
+
+    // Poll for result
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, i < 3 ? 1000 : 2000));
+      const poll = await fetch(response_url, {
+        headers: { Authorization: `Key ${falKey}` },
+      });
+      const data = await poll.json();
+      if (data.images) return data.images[0].url;
+    }
+    console.error("FAL polling timed out");
+    return null;
+  } catch (e: any) {
+    console.error("FAL error:", e.message);
     return null;
   }
 }
@@ -132,7 +155,7 @@ async function getNextScheduledDate(
   return new Date(`${dateStr}T${publishTime}:00Z`).toISOString();
 }
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const { brandId, layout } = await request.json();
@@ -164,7 +187,13 @@ export async function POST(request: Request) {
   const usedTopics = (topicRows ?? []).map((r: any) => r.topic);
 
   try {
-    const content = await generateContent(brand.name, CONTENT_PROMPTS[idx], needsSubtitle, usedTopics);
+    const content = await generateContent(
+      brand.name,
+      CONTENT_PROMPTS[idx],
+      needsSubtitle,
+      needsBackground,
+      usedTopics
+    );
 
     // Save the new topic for future deduplication
     const topic = content.title || content.caption?.slice(0, 60) || "";
@@ -172,10 +201,13 @@ export async function POST(request: Request) {
       await supabase.from("post_topics").insert({ brand_id: brandId, topic });
     }
 
-    // Search Unsplash for a background photo if the layout needs one
+    // Generate background image with FAL.ai for layouts 0, 1, 3
     let backgroundUrl: string | null = null;
-    if (needsBackground && content.photo_query) {
-      backgroundUrl = await searchUnsplash(content.photo_query);
+    if (needsBackground && content.bg_prompt) {
+      backgroundUrl = await generateFalBackground(
+        content.bg_prompt,
+        brand.primary_color ?? "#7C3DE3"
+      );
     }
 
     const scheduledAt = getNextScheduledDate(

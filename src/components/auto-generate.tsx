@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { toPng } from "html-to-image";
 import { useRouter } from "next/navigation";
 import { renderTemplate } from "./templates";
+import { toDataUrl } from "@/lib/image-utils";
 
 interface Brand {
   id: string;
@@ -13,21 +14,6 @@ interface Brand {
   logo_dark_url: string | null;
   primary_color: string;
   active_layouts: number[];
-}
-
-/** Fetch an image URL and return a base64 data URL (avoids CORS issues in html-to-image) */
-async function toDataUrl(url: string): Promise<string> {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return url;
-  }
 }
 
 export default function AutoGenerate({ brand }: { brand: Brand }) {

@@ -5,21 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toPng } from "html-to-image";
 import { renderTemplate } from "@/components/templates";
-
-/** Fetch an image URL and return a base64 data URL (avoids CORS issues in html-to-image) */
-async function toDataUrl(url: string): Promise<string> {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return url;
-  }
-}
+import { toDataUrl } from "@/lib/image-utils";
 
 export default function PostReviewPage() {
   const { id } = useParams();
