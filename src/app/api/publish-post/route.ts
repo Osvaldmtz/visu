@@ -75,6 +75,8 @@ async function publishPost(supabase: any, postId: string) {
   }
 
   try {
+    console.log("[publish-post] Sending to Postforme:", JSON.stringify(body));
+
     const res = await fetch("https://api.postforme.dev/v1/social-posts", {
       method: "POST",
       headers: {
@@ -85,16 +87,16 @@ async function publishPost(supabase: any, postId: string) {
     });
 
     const responseData = await res.json();
+    console.log("[publish-post] Postforme response:", res.status, JSON.stringify(responseData));
 
     if (!res.ok) {
-      console.error("Postforme API error:", res.status, JSON.stringify(responseData));
       return NextResponse.json(
         { error: `Postforme error: ${responseData.message || responseData.error || res.status}` },
         { status: 502 }
       );
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("posts")
       .update({
         status: "PUBLISHED",
@@ -102,9 +104,14 @@ async function publishPost(supabase: any, postId: string) {
       })
       .eq("id", postId);
 
+    if (updateError) {
+      console.error("[publish-post] DB update error:", updateError);
+    }
+
+    console.log("[publish-post] Success. Postforme status:", responseData.status);
     return NextResponse.json({ ok: true, response: responseData });
   } catch (e: any) {
-    console.error("Postforme API call failed:", e.message);
+    console.error("[publish-post] Error:", e.message);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
