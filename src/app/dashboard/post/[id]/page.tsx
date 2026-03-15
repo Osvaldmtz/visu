@@ -27,6 +27,8 @@ export default function PostReviewPage() {
   const [interactive, setInteractive] = useState(false);
   const [hasDragChanges, setHasDragChanges] = useState(false);
   const [savingPosition, setSavingPosition] = useState(false);
+  const [publishedMessage, setPublishedMessage] = useState("");
+  const [publishError, setPublishError] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -126,6 +128,35 @@ export default function PostReviewPage() {
       .eq("id", id);
     router.push("/dashboard");
     router.refresh();
+  };
+
+  const handlePublishNow = async () => {
+    if (!post) return;
+    setLoading("PUBLISH");
+    try {
+      // Save caption first
+      const supabase = createClient();
+      await supabase.from("posts").update({ caption }).eq("id", id);
+
+      const res = await fetch("/api/publish-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: post.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Publish failed");
+      }
+      setPublishedMessage("Publicado en Instagram y Facebook");
+      setTimeout(() => {
+        router.push("/dashboard");
+        router.refresh();
+      }, 2000);
+    } catch (e: any) {
+      console.error("Publish error:", e);
+      setPublishError(e.message);
+      setLoading("");
+    }
   };
 
   const handleRegenerate = async () => {
@@ -452,13 +483,28 @@ export default function PostReviewPage() {
                     className="w-28 bg-surface border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
-                <button
-                  onClick={handleSchedule}
-                  disabled={!scheduleDate || !!loading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-                >
-                  {loading === "SCHEDULE" ? "..." : isScheduled ? "Reprogramar" : "Programar"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSchedule}
+                    disabled={!scheduleDate || !!loading}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                  >
+                    {loading === "SCHEDULE" ? "..." : isScheduled ? "Reprogramar" : "Programar"}
+                  </button>
+                  <button
+                    onClick={handlePublishNow}
+                    disabled={!!loading}
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                  >
+                    {loading === "PUBLISH" ? "Publicando..." : "Publicar ahora"}
+                  </button>
+                </div>
+                {publishedMessage && (
+                  <p className="text-sm text-emerald-400 mt-2 text-center">{publishedMessage}</p>
+                )}
+                {publishError && (
+                  <p className="text-xs text-red-400 mt-2">{publishError}</p>
+                )}
               </div>
             )}
 
