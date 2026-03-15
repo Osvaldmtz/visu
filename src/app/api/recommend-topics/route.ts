@@ -10,14 +10,14 @@ export async function POST(request: Request) {
 
   const { data: brand } = await supabase
     .from("brands")
-    .select("name, industry")
+    .select("name, industry, brand_skill")
     .eq("id", brandId)
     .eq("user_id", user.id)
     .single();
 
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
 
-  const description = brandDescription || brand.industry || brand.name;
+  const description = brand.brand_skill?.trim() || brandDescription || brand.industry || brand.name;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

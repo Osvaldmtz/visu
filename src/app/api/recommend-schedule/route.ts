@@ -10,14 +10,16 @@ export async function POST(request: Request) {
 
   const { data: brand } = await supabase
     .from("brands")
-    .select("name, industry, ig_handle")
+    .select("name, industry, ig_handle, brand_skill")
     .eq("id", brandId)
     .eq("user_id", user.id)
     .single();
 
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
 
-  const industry = brand.industry || "salud mental / psicología clínica";
+  const industry = brand.brand_skill?.trim()
+    ? `(Contexto de marca: ${brand.brand_skill.slice(0, 500)})`
+    : (brand.industry || "salud mental / psicología clínica");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

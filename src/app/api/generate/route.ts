@@ -212,7 +212,7 @@ export async function POST(request: Request) {
   const usedTopics = (topicRows ?? []).map((r: any) => r.topic);
 
   try {
-    const systemPrompt = buildSystemPrompt(brand);
+    const systemPrompt = brand.brand_skill?.trim() || buildSystemPrompt(brand);
     const prompt = customTopic
       ? `Crea un post para ${brand.name} sobre el tema: "${customTopic}". El post debe ser relevante y atractivo para la audiencia de la marca.`
       : DEFAULT_CONTENT_PROMPTS[idx];

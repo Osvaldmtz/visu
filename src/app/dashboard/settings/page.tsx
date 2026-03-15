@@ -58,6 +58,9 @@ export default function SettingsPage() {
   const [brandVoice, setBrandVoice] = useState("");
   const [contentTopics, setContentTopics] = useState("");
   const [topicsToAvoid, setTopicsToAvoid] = useState("");
+  const [brandSkill, setBrandSkill] = useState("");
+  const [brandSkillUpdatedAt, setBrandSkillUpdatedAt] = useState<string | null>(null);
+  const [savingSkill, setSavingSkill] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -90,6 +93,8 @@ export default function SettingsPage() {
       setBrandVoice(data.brand_voice || "");
       setContentTopics(data.content_topics || "");
       setTopicsToAvoid(data.topics_to_avoid || "");
+      setBrandSkill(data.brand_skill || "");
+      setBrandSkillUpdatedAt(data.brand_skill_updated_at || null);
     };
     load();
   }, [router]);
@@ -473,6 +478,98 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </Section>
+
+          {/* Brand Skill */}
+          <Section title="Brand Skill">
+            <p className="text-xs text-neutral-500 -mt-2 mb-3">
+              Sube un archivo .md con el contexto completo de tu marca. Tiene prioridad sobre los campos individuales.
+            </p>
+
+            {brandSkill ? (
+              <div>
+                <div className="bg-surface border border-surface-border rounded-lg p-3 mb-3 max-h-48 overflow-y-auto">
+                  <pre className="text-xs text-neutral-300 whitespace-pre-wrap font-mono">{brandSkill.slice(0, 2000)}{brandSkill.length > 2000 ? "\n..." : ""}</pre>
+                </div>
+                {brandSkillUpdatedAt && (
+                  <p className="text-xs text-neutral-500 mb-3">
+                    Actualizado: {new Date(brandSkillUpdatedAt).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <label className="cursor-pointer bg-surface-light hover:bg-surface-border text-neutral-300 font-medium px-4 py-2 rounded-lg transition-colors text-xs border border-surface-border">
+                    Reemplazar archivo
+                    <input
+                      type="file"
+                      accept=".md,.txt"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await file.text();
+                        setBrandSkill(text);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    onClick={async () => {
+                      if (!brand) return;
+                      setSavingSkill(true);
+                      const supabase = createClient();
+                      await supabase.from("brands").update({ brand_skill: null, brand_skill_updated_at: null }).eq("id", brand.id);
+                      setBrandSkill("");
+                      setBrandSkillUpdatedAt(null);
+                      setSavingSkill(false);
+                    }}
+                    disabled={savingSkill}
+                    className="text-xs text-red-400 hover:text-red-300 px-3 py-2 transition-colors"
+                  >
+                    Eliminar skill
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="cursor-pointer border-2 border-dashed border-surface-border hover:border-accent/50 rounded-xl p-6 flex flex-col items-center justify-center transition-colors">
+                <svg className="w-8 h-8 text-neutral-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="text-sm text-neutral-400">Subir archivo .md</span>
+                <span className="text-xs text-neutral-600 mt-1">Contexto completo de marca para la IA</span>
+                <input
+                  type="file"
+                  accept=".md,.txt"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const text = await file.text();
+                    setBrandSkill(text);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
+
+            {brandSkill && (
+              <button
+                onClick={async () => {
+                  if (!brand) return;
+                  setSavingSkill(true);
+                  const supabase = createClient();
+                  await supabase.from("brands").update({
+                    brand_skill: brandSkill,
+                    brand_skill_updated_at: new Date().toISOString(),
+                  }).eq("id", brand.id);
+                  setBrandSkillUpdatedAt(new Date().toISOString());
+                  setSavingSkill(false);
+                }}
+                disabled={savingSkill}
+                className="mt-3 bg-accent hover:bg-accent/90 disabled:opacity-50 text-white font-medium px-6 py-2.5 rounded-lg transition-colors text-sm"
+              >
+                {savingSkill ? "Guardando..." : "Guardar skill"}
+              </button>
+            )}
           </Section>
 
           {/* Save */}
