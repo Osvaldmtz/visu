@@ -496,8 +496,8 @@ export default function PostReviewPage() {
             <h2 className="text-xl font-bold mb-1">{post.title}</h2>
             <span className="text-xs text-neutral-500 mb-4">
               Layout {post.layout} &middot; {post.status}
-              {post.scheduled_at && (
-                <> &middot; {new Date(post.scheduled_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</>
+              {(post.status === "SCHEDULED" || post.status === "PUBLISHED") && post.scheduled_at && (
+                <> &middot; {new Date(post.scheduled_at).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</>
               )}
             </span>
 

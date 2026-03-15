@@ -1,6 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// Optimal posting times per ISO day (1=Mon..7=Sun)
+const OPTIMAL_TIMES: Record<number, string> = {
+  1: "08:00", // Lunes
+  2: "08:00", // Martes
+  3: "13:00", // Miercoles
+  4: "08:00", // Jueves
+  5: "18:00", // Viernes
+  6: "10:00", // Sabado
+  7: "20:00", // Domingo
+};
+
+const DAY_NAMES: Record<number, string> = {
+  1: "Lunes", 2: "Martes", 3: "Miercoles", 4: "Jueves",
+  5: "Viernes", 6: "Sabado", 7: "Domingo",
+};
+
 export async function POST(request: Request) {
   const { brandId } = await request.json();
 
@@ -10,61 +26,27 @@ export async function POST(request: Request) {
 
   const { data: brand } = await supabase
     .from("brands")
-    .select("name, industry, ig_handle, brand_skill")
+    .select("name, industry, preferred_days")
     .eq("id", brandId)
     .eq("user_id", user.id)
     .single();
 
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
 
-  const industry = brand.brand_skill?.trim()
-    ? `(Contexto de marca: ${brand.brand_skill.slice(0, 500)})`
-    : (brand.industry || "salud mental / psicología clínica");
+  const preferredDays = brand.preferred_days?.length ? brand.preferred_days : [1, 5];
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": process.env.ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [
-        {
-          role: "user",
-          content: `Eres experto en social media para la industria de ${industry}. La marca "${brand.name}" publica contenido para profesionales en Latinoamérica (zona horaria America/Mexico_City).
+  // Pick the first preferred day and its optimal time
+  const primaryDay = preferredDays[0];
+  const time = OPTIMAL_TIMES[primaryDay] ?? "09:00";
 
-Recomienda los mejores días y hora para publicar en Instagram y Facebook para maximizar engagement.
+  const dayList = preferredDays.map((d: number) => DAY_NAMES[d]).join(" y ");
+  const timeList = preferredDays
+    .map((d: number) => `${DAY_NAMES[d]} ${OPTIMAL_TIMES[d] ?? "09:00"}`)
+    .join(", ");
 
-Responde SOLO con JSON válido:
-{
-  "days": [números ISO 1=Lun a 7=Dom, elige 2-3 días],
-  "time": "HH:MM en formato 24h",
-  "reason": "explicación breve en español (1-2 oraciones)"
-}`,
-        },
-      ],
-    }),
+  return NextResponse.json({
+    days: preferredDays,
+    time,
+    reason: `Horarios optimos para ${brand.industry || "tu audiencia"} en LATAM: ${timeList}. Mayor engagement en ${dayList}.`,
   });
-
-  const data = await res.json();
-  if (!data.content?.[0]?.text) {
-    return NextResponse.json({ error: "AI response error" }, { status: 500 });
-  }
-
-  let raw = data.content[0].text.trim();
-  if (raw.startsWith("```")) {
-    const lines = raw.split("\n");
-    raw = lines.slice(1).join("\n");
-    if (raw.endsWith("```")) raw = raw.slice(0, -3).trim();
-  }
-
-  try {
-    const recommendation = JSON.parse(raw);
-    return NextResponse.json(recommendation);
-  } catch {
-    return NextResponse.json({ error: "Failed to parse recommendation" }, { status: 500 });
-  }
 }
