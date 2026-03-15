@@ -124,11 +124,14 @@ export default function CalendarView({ posts, preferredDays }: { posts: Post[]; 
   const postsByDate = useMemo(() => {
     const map: Record<string, Post[]> = {};
     for (const post of posts) {
-      if (post.status === "DISCARDED") continue;
-      const date = getPostDate(post);
-      if (!date) continue;
-      if (!map[date]) map[date] = [];
-      map[date].push(post);
+      // Only show posts with scheduled_at that are SCHEDULED or PUBLISHED
+      if (!post.scheduled_at) continue;
+      if (post.status !== "SCHEDULED" && post.status !== "PUBLISHED") continue;
+      try {
+        const date = new Date(post.scheduled_at).toISOString().split("T")[0];
+        if (!map[date]) map[date] = [];
+        map[date].push(post);
+      } catch { /* skip invalid */ }
     }
     return map;
   }, [posts]);
@@ -142,7 +145,7 @@ export default function CalendarView({ posts, preferredDays }: { posts: Post[]; 
   const goNext = () => { if (month === 11) { setYear(year + 1); setMonth(0); } else setMonth(month + 1); };
   const goPrev = () => { if (month === 0) { setYear(year - 1); setMonth(11); } else setMonth(month - 1); };
 
-  const totalScheduled = posts.filter((p) => p.status === "SCHEDULED" || p.status === "APPROVED").length;
+  const totalScheduled = posts.filter((p) => p.scheduled_at && p.status === "SCHEDULED").length;
 
   const handlePostAction = (post: Post, e: React.MouseEvent) => {
     setPopup({ post, x: e.clientX, y: e.clientY });
