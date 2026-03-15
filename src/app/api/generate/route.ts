@@ -123,7 +123,8 @@ async function getNextScheduledDate(
   publishTime: string,
   timezone: string,
   brandId: string,
-  supabase: any
+  supabase: any,
+  extraExcludeDates: string[] = []
 ): Promise<string | null> {
   // Validate inputs
   const days = Array.isArray(preferredDays) && preferredDays.length > 0 ? preferredDays : [1];
@@ -143,6 +144,12 @@ async function getNextScheduledDate(
     try {
       bookedDates.add(new Date(p.scheduled_at).toISOString().split("T")[0]);
     } catch { /* skip invalid dates */ }
+  }
+  // Add dates already claimed by the current batch
+  for (const d of extraExcludeDates) {
+    try {
+      bookedDates.add(new Date(d).toISOString().split("T")[0]);
+    } catch { /* skip */ }
   }
 
   const now = new Date();
@@ -176,7 +183,7 @@ async function getNextScheduledDate(
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const { brandId, layout } = await request.json();
+  const { brandId, layout, excludeDates } = await request.json();
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -234,7 +241,8 @@ export async function POST(request: Request) {
       brand.publish_time ?? "09:00",
       brand.timezone ?? "America/Mexico_City",
       brandId,
-      supabase
+      supabase,
+      excludeDates ?? []
     );
 
     return NextResponse.json({

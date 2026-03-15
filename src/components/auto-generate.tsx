@@ -127,11 +127,11 @@ export default function AutoGenerate({
     return () => { localCancelled = true; };
   }, [pendingRender, brand.id, router]);
 
-  const generateOnePost = async (logoDataUrl: string, layout: number): Promise<PendingPost> => {
+  const generateOnePost = async (logoDataUrl: string, layout: number, excludeDates: string[]): Promise<PendingPost> => {
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brandId: brand.id, layout }),
+      body: JSON.stringify({ brandId: brand.id, layout, excludeDates }),
     });
     if (!res.ok) {
       const err = await res.json();
@@ -175,13 +175,15 @@ export default function AutoGenerate({
 
       // Generate all posts content sequentially (respects topic dedup + cancel)
       const posts: PendingPost[] = [];
+      const claimedDates: string[] = [];
       for (let i = 0; i < totalPosts; i++) {
         if (cancelledRef.current) break;
         setStatus(`generating ${i + 1}/${totalPosts}`);
         const layout = pickLayout();
         const logoDataUrl = layout <= 1 ? lightDataUrl : darkDataUrl;
-        const post = await generateOnePost(logoDataUrl, layout);
+        const post = await generateOnePost(logoDataUrl, layout, claimedDates);
         posts.push(post);
+        if (post.scheduledAt) claimedDates.push(post.scheduledAt);
       }
 
       if (cancelledRef.current && posts.length === 0) {
