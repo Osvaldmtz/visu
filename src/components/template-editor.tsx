@@ -45,6 +45,7 @@ export default function TemplateEditor({
   const [title, setTitle] = useState(initialTitle);
   const [subtitle, setSubtitle] = useState(initialSubtitle);
   const [caption, setCaption] = useState(initialCaption);
+  const [customTopic, setCustomTopic] = useState("");
   const [primaryColor, setPrimaryColor] = useState(brand.primary_color ?? "#7C3DE3");
   const [backgroundUrl, setBackgroundUrl] = useState(initialBackgroundUrl ?? "");
   const [exporting, setExporting] = useState(false);
@@ -85,7 +86,7 @@ export default function TemplateEditor({
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId: brand.id, layout }),
+        body: JSON.stringify({ brandId: brand.id, layout, ...(customTopic ? { customTopic } : {}) }),
       });
       const data = await res.json();
       if (data.title) setTitle(data.title);
@@ -210,6 +211,20 @@ export default function TemplateEditor({
 
       {/* Controls panel */}
       <div className="w-full lg:w-80 space-y-5">
+        {/* Custom topic */}
+        <div>
+          <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+            Tema del post (opcional)
+          </label>
+          <input
+            type="text"
+            value={customTopic}
+            onChange={(e) => setCustomTopic(e.target.value)}
+            placeholder="Ej: Dia de la Mujer, Navidad, Dia del Psicologo..."
+            className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-accent placeholder-neutral-600"
+          />
+        </div>
+
         {/* Template selector */}
         <div>
           <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">

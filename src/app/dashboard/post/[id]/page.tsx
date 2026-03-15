@@ -167,6 +167,17 @@ export default function PostReviewPage() {
     router.refresh();
   };
 
+  const handleUnschedule = async () => {
+    setLoading("UNSCHEDULE");
+    const supabase = createClient();
+    await supabase
+      .from("posts")
+      .update({ status: "APPROVED", scheduled_at: null })
+      .eq("id", id);
+    router.push("/dashboard");
+    router.refresh();
+  };
+
   const handlePublishNow = async () => {
     if (!post) return;
     setLoading("PUBLISH");
@@ -592,6 +603,15 @@ export default function PostReviewPage() {
                   >
                     {loading === "SCHEDULE" ? "..." : isScheduled ? "Reprogramar" : "Programar"}
                   </button>
+                  {isScheduled && (
+                    <button
+                      onClick={handleUnschedule}
+                      disabled={!!loading}
+                      className="px-4 bg-surface border border-surface-border hover:border-yellow-500/50 disabled:opacity-50 text-yellow-400 font-medium py-2.5 rounded-lg transition-colors text-xs"
+                    >
+                      {loading === "UNSCHEDULE" ? "..." : "Desprogramar"}
+                    </button>
+                  )}
                 </div>
 
                 {publishedMessage && (

@@ -183,7 +183,7 @@ async function getNextScheduledDate(
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const { brandId, layout, excludeDates } = await request.json();
+  const { brandId, layout, excludeDates, customTopic } = await request.json();
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -213,9 +213,12 @@ export async function POST(request: Request) {
 
   try {
     const systemPrompt = buildSystemPrompt(brand);
+    const prompt = customTopic
+      ? `Crea un post para ${brand.name} sobre el tema: "${customTopic}". El post debe ser relevante y atractivo para la audiencia de la marca.`
+      : DEFAULT_CONTENT_PROMPTS[idx];
     const content = await generateContent(
       systemPrompt,
-      DEFAULT_CONTENT_PROMPTS[idx],
+      prompt,
       needsSubtitle,
       needsBackground,
       usedTopics
