@@ -16,6 +16,8 @@ export default function PostReviewPage() {
   const [caption, setCaption] = useState("");
   const [loading, setLoading] = useState("");
   const [regenData, setRegenData] = useState<any>(null);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("09:00");
 
   useEffect(() => {
     const load = async () => {
@@ -28,6 +30,11 @@ export default function PostReviewPage() {
       if (postData) {
         setPost(postData);
         setCaption(postData.caption);
+        if (postData.scheduled_at) {
+          const d = new Date(postData.scheduled_at);
+          setScheduleDate(d.toISOString().split("T")[0]);
+          setScheduleTime(d.toISOString().split("T")[1].slice(0, 5));
+        }
         const { data: brandData } = await supabase
           .from("brands")
           .select("*")
@@ -47,19 +54,30 @@ export default function PostReviewPage() {
     router.refresh();
   };
 
+  const handleSchedule = async () => {
+    if (!scheduleDate) return;
+    setLoading("SCHEDULE");
+    const scheduledAt = `${scheduleDate}T${scheduleTime}:00Z`;
+    const supabase = createClient();
+    await supabase
+      .from("posts")
+      .update({ status: "SCHEDULED", caption, scheduled_at: scheduledAt })
+      .eq("id", id);
+    router.push("/dashboard");
+    router.refresh();
+  };
+
   const handleRegenerate = async () => {
     if (!brand) return;
     setLoading("REGENERATE");
 
     try {
-      // Pre-load logo as data URL
       const logoSrc =
         post.layout <= 1
           ? brand.logo_light_url || brand.logo_url || ""
           : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "";
       const logoDataUrl = logoSrc ? await toDataUrl(logoSrc) : "";
 
-      // Generate new content (includes Unsplash search server-side)
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,7 +86,6 @@ export default function PostReviewPage() {
       if (!res.ok) throw new Error("Generation failed");
       const data = await res.json();
 
-      // Pre-load background photo as data URL if present
       let bgDataUrl = "";
       if (data.backgroundUrl) {
         bgDataUrl = await toDataUrl(data.backgroundUrl);
@@ -88,7 +105,6 @@ export default function PostReviewPage() {
     }
   };
 
-  // When regenData is set, wait for paint then capture + upload
   useEffect(() => {
     if (!regenData || !brand || !post) return;
     let cancelled = false;
@@ -154,6 +170,9 @@ export default function PostReviewPage() {
     );
   }
 
+  const isScheduled = post.status === "SCHEDULED";
+  const isPublished = post.status === "PUBLISHED";
+
   return (
     <div className="min-h-screen px-4 py-8">
       <div className="max-w-4xl mx-auto">
@@ -173,40 +192,81 @@ export default function PostReviewPage() {
 
           <div className="flex flex-col">
             <h2 className="text-xl font-bold mb-1">{post.title}</h2>
-            <span className="text-xs text-neutral-500 mb-6">
+            <span className="text-xs text-neutral-500 mb-4">
               Layout {post.layout} &middot; {post.status}
+              {post.scheduled_at && (
+                <> &middot; {new Date(post.scheduled_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</>
+              )}
             </span>
 
             <label className="text-sm text-neutral-400 mb-2">Caption</label>
             <textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              rows={8}
-              className="bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent mb-6 flex-1"
+              rows={6}
+              disabled={isPublished}
+              className="bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent mb-4 flex-1 disabled:opacity-50"
             />
 
+            {/* Schedule section */}
+            {!isPublished && (
+              <div className="mb-4 p-4 bg-surface-light border border-surface-border rounded-lg">
+                <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                  Programar publicacion
+                </label>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    className="flex-1 bg-surface border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
+                  />
+                  <input
+                    type="time"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    className="w-28 bg-surface border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <button
+                  onClick={handleSchedule}
+                  disabled={!scheduleDate || !!loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+                >
+                  {loading === "SCHEDULE" ? "..." : isScheduled ? "Reprogramar" : "Programar"}
+                </button>
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button
-                onClick={() => updateStatus("APPROVED")}
-                disabled={!!loading}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm"
-              >
-                {loading === "APPROVED" ? "..." : "Aprobar"}
-              </button>
-              <button
-                onClick={handleRegenerate}
-                disabled={!!loading}
-                className="flex-1 bg-surface-light hover:bg-surface-border disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm border border-surface-border"
-              >
-                {loading === "REGENERATE" ? "Regenerando..." : "Regenerar"}
-              </button>
-              <button
-                onClick={() => updateStatus("DISCARDED")}
-                disabled={!!loading}
-                className="flex-1 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 font-medium py-3 rounded-lg transition-colors text-sm"
-              >
-                {loading === "DISCARDED" ? "..." : "Descartar"}
-              </button>
+              {!isPublished && (
+                <button
+                  onClick={() => updateStatus("APPROVED")}
+                  disabled={!!loading}
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm"
+                >
+                  {loading === "APPROVED" ? "..." : "Aprobar"}
+                </button>
+              )}
+              {!isPublished && (
+                <button
+                  onClick={handleRegenerate}
+                  disabled={!!loading}
+                  className="flex-1 bg-surface-light hover:bg-surface-border disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm border border-surface-border"
+                >
+                  {loading === "REGENERATE" ? "Regenerando..." : "Regenerar"}
+                </button>
+              )}
+              {!isPublished && (
+                <button
+                  onClick={() => updateStatus("DISCARDED")}
+                  disabled={!!loading}
+                  className="flex-1 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 font-medium py-3 rounded-lg transition-colors text-sm"
+                >
+                  {loading === "DISCARDED" ? "..." : "Descartar"}
+                </button>
+              )}
             </div>
           </div>
         </div>

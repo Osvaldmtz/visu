@@ -33,6 +33,14 @@ export function PostCard({ post }: { post: any }) {
             {post.status}
           </span>
         </div>
+        {post.status === "SCHEDULED" && post.scheduled_at && (
+          <p className="text-xs text-blue-400 mb-1">
+            {new Date(post.scheduled_at).toLocaleString("es-MX", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
+          </p>
+        )}
         <p className="text-sm text-neutral-300 line-clamp-2">{post.caption}</p>
       </div>
     </div>
