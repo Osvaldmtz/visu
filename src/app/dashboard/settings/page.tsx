@@ -36,6 +36,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [recommending, setRecommending] = useState(false);
   const [recommendation, setRecommendation] = useState<any>(null);
+  const [recommendingTopics, setRecommendingTopics] = useState(false);
+  const [topicSuggestion, setTopicSuggestion] = useState<any>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -52,6 +54,10 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState("America/Mexico_City");
   const [logoLightPreview, setLogoLightPreview] = useState<string | null>(null);
   const [logoDarkPreview, setLogoDarkPreview] = useState<string | null>(null);
+  const [brandDescription, setBrandDescription] = useState("");
+  const [brandVoice, setBrandVoice] = useState("");
+  const [contentTopics, setContentTopics] = useState("");
+  const [topicsToAvoid, setTopicsToAvoid] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -80,6 +86,10 @@ export default function SettingsPage() {
       setTimezone(data.timezone || "America/Mexico_City");
       setLogoLightPreview(data.logo_light_url || null);
       setLogoDarkPreview(data.logo_dark_url || null);
+      setBrandDescription(data.brand_description || "");
+      setBrandVoice(data.brand_voice || "");
+      setContentTopics(data.content_topics || "");
+      setTopicsToAvoid(data.topics_to_avoid || "");
     };
     load();
   }, [router]);
@@ -124,6 +134,10 @@ export default function SettingsPage() {
         preferred_days: preferredDays,
         publish_time: publishTime,
         timezone,
+        brand_description: brandDescription || null,
+        brand_voice: brandVoice || null,
+        content_topics: contentTopics || null,
+        topics_to_avoid: topicsToAvoid || null,
       })
       .eq("id", brand.id);
     setSaving(false);
@@ -148,6 +162,33 @@ export default function SettingsPage() {
     } finally {
       setRecommending(false);
     }
+  };
+
+  const handleRecommendTopics = async () => {
+    if (!brand) return;
+    setRecommendingTopics(true);
+    setTopicSuggestion(null);
+    try {
+      const res = await fetch("/api/recommend-topics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandId: brand.id, brandDescription, brandVoice }),
+      });
+      if (res.ok) setTopicSuggestion(await res.json());
+    } finally {
+      setRecommendingTopics(false);
+    }
+  };
+
+  const applyTopicSuggestion = () => {
+    if (!topicSuggestion) return;
+    if (topicSuggestion.suggested_topics) {
+      setContentTopics(topicSuggestion.suggested_topics.join("\n"));
+    }
+    if (topicSuggestion.topics_to_avoid) {
+      setTopicsToAvoid(topicSuggestion.topics_to_avoid.join("\n"));
+    }
+    setTopicSuggestion(null);
   };
 
   const applyRecommendation = () => {
@@ -262,6 +303,89 @@ export default function SettingsPage() {
                 ))}
               </select>
             </Field>
+          </Section>
+
+          {/* Content & Voice */}
+          <Section title="Contenido y tono">
+            <Field label="Descripcion de la marca">
+              <textarea
+                value={brandDescription}
+                onChange={(e) => setBrandDescription(e.target.value)}
+                rows={3}
+                placeholder="Ej: Plataforma SaaS para psicologos clinicos en LATAM. Permite gestionar pacientes, aplicar tests digitales y generar reportes con IA."
+                className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent"
+              />
+            </Field>
+            <Field label="Tono de voz">
+              <textarea
+                value={brandVoice}
+                onChange={(e) => setBrandVoice(e.target.value)}
+                rows={2}
+                placeholder="Ej: Clinico-profesional, empatico, directo. Español latinoamericano neutro."
+                className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent"
+              />
+            </Field>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-neutral-500">Temas de contenido</span>
+                <button
+                  onClick={handleRecommendTopics}
+                  disabled={recommendingTopics}
+                  className="text-xs text-accent hover:text-accent/80 disabled:opacity-50 transition-colors"
+                >
+                  {recommendingTopics ? "Analizando..." : "Sugerir temas con IA"}
+                </button>
+              </div>
+              <textarea
+                value={contentTopics}
+                onChange={(e) => setContentTopics(e.target.value)}
+                rows={4}
+                placeholder="Un tema por linea. Ej:&#10;Tests psicologicos (PHQ-9, GAD-7)&#10;Burnout del psicologo&#10;Documentacion clinica"
+                className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent"
+              />
+            </div>
+            <Field label="Temas a evitar">
+              <textarea
+                value={topicsToAvoid}
+                onChange={(e) => setTopicsToAvoid(e.target.value)}
+                rows={3}
+                placeholder="Un tema por linea. Ej:&#10;Medicina fisica&#10;Signos vitales&#10;Hospitales / UCI"
+                className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent"
+              />
+            </Field>
+
+            {topicSuggestion && (
+              <div className="p-4 bg-accent/5 border border-accent/20 rounded-xl">
+                <p className="text-xs text-neutral-400 mb-2">{topicSuggestion.reasoning}</p>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <p className="text-xs font-medium text-green-400 mb-1">Temas sugeridos ({topicSuggestion.suggested_topics?.length})</p>
+                    <ul className="text-xs text-neutral-300 space-y-0.5">
+                      {topicSuggestion.suggested_topics?.slice(0, 8).map((t: string, i: number) => (
+                        <li key={i}>- {t}</li>
+                      ))}
+                      {(topicSuggestion.suggested_topics?.length ?? 0) > 8 && (
+                        <li className="text-neutral-500">+{topicSuggestion.suggested_topics.length - 8} mas...</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-red-400 mb-1">Evitar ({topicSuggestion.topics_to_avoid?.length})</p>
+                    <ul className="text-xs text-neutral-300 space-y-0.5">
+                      {topicSuggestion.topics_to_avoid?.map((t: string, i: number) => (
+                        <li key={i}>- {t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                <button
+                  onClick={applyTopicSuggestion}
+                  className="text-xs bg-accent hover:bg-accent/90 text-white px-4 py-1.5 rounded-lg transition-colors"
+                >
+                  Aplicar sugerencias
+                </button>
+              </div>
+            )}
           </Section>
 
           {/* Social */}
