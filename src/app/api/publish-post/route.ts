@@ -49,24 +49,24 @@ async function publishPost(supabase: any, postId: string) {
     }
   }
 
-  const accounts = [igAccountId, fbAccountId].filter(Boolean);
-  if (accounts.length === 0) {
+  const socialAccounts = [igAccountId, fbAccountId].filter(Boolean) as string[];
+  if (socialAccounts.length === 0) {
     return NextResponse.json({ error: "No social accounts configured" }, { status: 400 });
   }
 
-  const apiKeyEnv = process.env.POSTFORME_API_KEY;
-  if (!apiKeyEnv) {
+  const pfmApiKey = process.env.POSTFORME_API_KEY;
+  if (!pfmApiKey) {
     return NextResponse.json({ error: "POSTFORME_API_KEY not configured" }, { status: 500 });
   }
 
+  // Build Postforme API request body
   const body: any = {
-    accounts,
-    content: {
-      body: post.caption || "",
-      media: post.image_url ? [{ url: post.image_url }] : [],
-    },
+    caption: post.caption || "",
+    social_accounts: socialAccounts,
+    media: post.image_url ? [{ url: post.image_url }] : [],
   };
 
+  // If scheduled_at is in the future, include it
   if (post.scheduled_at) {
     const scheduledDate = new Date(post.scheduled_at);
     if (scheduledDate > new Date()) {
@@ -75,10 +75,10 @@ async function publishPost(supabase: any, postId: string) {
   }
 
   try {
-    const res = await fetch("https://api.postforme.dev/v1/posts", {
+    const res = await fetch("https://api.postforme.dev/v1/social-posts", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKeyEnv}`,
+        Authorization: `Bearer ${pfmApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
@@ -89,7 +89,7 @@ async function publishPost(supabase: any, postId: string) {
     if (!res.ok) {
       console.error("Postforme API error:", res.status, JSON.stringify(responseData));
       return NextResponse.json(
-        { error: `Postforme API error: ${responseData.message || res.status}` },
+        { error: `Postforme error: ${responseData.message || responseData.error || res.status}` },
         { status: 502 }
       );
     }
