@@ -85,7 +85,8 @@ export default async function DashboardPage({
             >
               Crear manualmente
             </Link>
-            <AutoGenerate brand={brand} />
+            <AutoGenerate brand={brand} mode="single" />
+            <AutoGenerate brand={brand} mode="batch" />
           </div>
         </div>
 

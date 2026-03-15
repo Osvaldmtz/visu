@@ -1,34 +1,32 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-const SYSTEM_PROMPT = `Eres el social media manager de Kalyo, una plataforma SaaS para PSICÓLOGOS CLÍNICOS en Latinoamérica. Kalyo permite gestionar pacientes, aplicar tests psicológicos digitales (PHQ-9, GAD-7, Beck, Hamilton, etc), generar reportes con IA y administrar la consulta.
-
-Audiencia: psicólogos clínicos 28-45 años, práctica privada o institucional en LATAM.
-
-Tono: clínico-profesional, empático, directo. Español latinoamericano neutro. Sin emojis excesivos.
-
-Temas válidos:
-- Tests psicológicos y su interpretación (PHQ-9, GAD-7, Beck, Hamilton, MMPI, Rorschach, WAIS, etc)
-- Documentación clínica y papeleo del psicólogo
-- Burnout del psicólogo clínico
-- Gestión de pacientes y citas
-- Evaluación psicológica y psicodiagnóstico
-- Features de Kalyo (reportes IA, tests digitales, expediente clínico)
-- Salud mental, terapia, psicoterapia
-
-Tagline: Evalúa más. Documenta menos. Trata mejor.
-
-NUNCA generar contenido sobre: medicina física, signos vitales, hospitales, UCI, cardiología, cirugía, enfermería, o cualquier especialidad médica que no sea psicología clínica.`;
-
-const CONTENT_PROMPTS = [
-  "Crea un post educativo sobre un test psicológico específico (PHQ-9, GAD-7, Beck, Hamilton, etc). Incluye un dato clínico real sobre su uso o validez.",
-  "Crea un post mostrando ahorro de tiempo para el psicólogo. Usa números concretos contrastando antes vs después de usar Kalyo para documentación o evaluación.",
-  "Crea un post que conecte con el burnout del psicólogo clínico: exceso de papeleo, notas clínicas, reportes manuales, falta de tiempo para pacientes.",
-  "Crea un post destacando una funcionalidad específica de Kalyo: tests digitales, reportes con IA, expediente clínico, o gestión de pacientes.",
+const DEFAULT_CONTENT_PROMPTS = [
+  "Crea un post educativo sobre un tema relevante para la audiencia de la marca. Incluye un dato o estadística real.",
+  "Crea un post mostrando ahorro de tiempo o eficiencia. Usa números concretos contrastando antes vs después.",
+  "Crea un post que conecte emocionalmente con los problemas diarios de la audiencia.",
+  "Crea un post destacando una funcionalidad o beneficio específico del producto/servicio.",
 ];
 
+function buildSystemPrompt(brand: any): string {
+  const description = brand.brand_description || `${brand.name} — ${brand.industry || "negocio"}`;
+  const voice = brand.brand_voice || "Profesional, empático, directo. Español latinoamericano neutro.";
+  const topics = brand.content_topics
+    ? `\n\nTemas válidos:\n${brand.content_topics.split("\n").map((t: string) => `- ${t.trim()}`).filter((t: string) => t !== "- ").join("\n")}`
+    : "";
+  const avoid = brand.topics_to_avoid
+    ? `\n\nNUNCA generar contenido sobre:\n${brand.topics_to_avoid.split("\n").map((t: string) => `- ${t.trim()}`).filter((t: string) => t !== "- ").join("\n")}`
+    : "";
+
+  return `Eres el social media manager de ${brand.name}. ${description}
+
+Tono: ${voice}${topics}${avoid}
+
+Escribe en español latinoamericano. Sé conciso y relevante para la audiencia de la marca.`;
+}
+
 async function generateContent(
-  brandName: string,
+  systemPrompt: string,
   prompt: string,
   needsSubtitle: boolean,
   needsBackground: boolean,
@@ -57,7 +55,7 @@ async function generateContent(
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [
         {
           role: "user",
@@ -207,9 +205,10 @@ export async function POST(request: Request) {
   const usedTopics = (topicRows ?? []).map((r: any) => r.topic);
 
   try {
+    const systemPrompt = buildSystemPrompt(brand);
     const content = await generateContent(
-      brand.name,
-      CONTENT_PROMPTS[idx],
+      systemPrompt,
+      DEFAULT_CONTENT_PROMPTS[idx],
       needsSubtitle,
       needsBackground,
       usedTopics
