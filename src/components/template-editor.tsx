@@ -151,6 +151,8 @@ export default function TemplateEditor({
       formData.append("layout", String(layout));
       formData.append("title", title);
       formData.append("caption", caption);
+      if (subtitle) formData.append("subtitle", subtitle);
+      if (backgroundUrl) formData.append("background_url", backgroundUrl);
       if (postId) formData.append("postId", postId);
       if (scheduledAt) formData.append("scheduled_at", scheduledAt);
 

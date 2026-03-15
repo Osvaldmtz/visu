@@ -1,4 +1,5 @@
 import React from "react";
+import DraggableElement from "./draggable-element";
 
 interface SplitProps {
   title: string;
@@ -6,6 +7,8 @@ interface SplitProps {
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
+  draggable?: boolean;
+  scale?: number;
 }
 
 export default function SplitTemplate({
@@ -14,6 +17,8 @@ export default function SplitTemplate({
   logoUrl,
   primaryColor,
   backgroundUrl,
+  draggable,
+  scale,
 }: SplitProps) {
   return (
     <div
@@ -33,26 +38,40 @@ export default function SplitTemplate({
           height: "100%",
           backgroundColor: primaryColor,
           position: "relative",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
           padding: 60,
         }}
       >
         {/* Logo top left */}
         {logoUrl && (
-          <div>
+          <DraggableElement
+            enabled={draggable}
+            scale={scale}
+            style={{
+              position: "absolute",
+              top: 60,
+              left: 60,
+            }}
+          >
             <img
               src={logoUrl}
               alt="Logo"
               style={{ maxWidth: 120, maxHeight: 60, objectFit: "contain" }}
               crossOrigin="anonymous"
             />
-          </div>
+          </DraggableElement>
         )}
 
-        {/* Title + subtitle bottom left */}
-        <div>
+        {/* Title bottom left */}
+        <DraggableElement
+          enabled={draggable}
+          scale={scale}
+          style={{
+            position: "absolute",
+            bottom: 120,
+            left: 60,
+            right: 20,
+          }}
+        >
           <h1
             style={{
               color: "#FFFFFF",
@@ -65,7 +84,20 @@ export default function SplitTemplate({
           >
             {title}
           </h1>
-          {subtitle && (
+        </DraggableElement>
+
+        {/* Subtitle */}
+        {subtitle && (
+          <DraggableElement
+            enabled={draggable}
+            scale={scale}
+            style={{
+              position: "absolute",
+              bottom: 60,
+              left: 60,
+              right: 20,
+            }}
+          >
             <p
               style={{
                 color: "#D4C4F0",
@@ -76,8 +108,8 @@ export default function SplitTemplate({
             >
               {subtitle}
             </p>
-          )}
-        </div>
+          </DraggableElement>
+        )}
       </div>
 
       {/* Right half — photo or dark gradient */}

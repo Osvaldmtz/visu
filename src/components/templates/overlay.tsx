@@ -1,13 +1,16 @@
 import React from "react";
+import DraggableElement from "./draggable-element";
 
 interface OverlayProps {
   title: string;
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
+  draggable?: boolean;
+  scale?: number;
 }
 
-export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl }: OverlayProps) {
+export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, draggable, scale }: OverlayProps) {
   return (
     <div
       style={{
@@ -67,7 +70,9 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
 
       {/* Logo top left */}
       {logoUrl && (
-        <div
+        <DraggableElement
+          enabled={draggable}
+          scale={scale}
           style={{
             position: "absolute",
             top: 60,
@@ -80,11 +85,13 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
             style={{ maxWidth: 160, maxHeight: 80, objectFit: "contain" }}
             crossOrigin="anonymous"
           />
-        </div>
+        </DraggableElement>
       )}
 
       {/* Title at bottom */}
-      <div
+      <DraggableElement
+        enabled={draggable}
+        scale={scale}
         style={{
           position: "absolute",
           bottom: 80,
@@ -105,7 +112,7 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
         >
           {title}
         </h1>
-      </div>
+      </DraggableElement>
     </div>
   );
 }

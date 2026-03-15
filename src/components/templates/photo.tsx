@@ -1,15 +1,20 @@
 import React from "react";
+import DraggableElement from "./draggable-element";
 
 interface PhotoProps {
   title: string;
   logoUrl: string;
   backgroundUrl?: string;
+  draggable?: boolean;
+  scale?: number;
 }
 
 export default function PhotoTemplate({
   title,
   logoUrl,
   backgroundUrl,
+  draggable,
+  scale,
 }: PhotoProps) {
   return (
     <div
@@ -46,48 +51,55 @@ export default function PhotoTemplate({
       )}
 
       {/* White card at bottom */}
-      <div
+      <DraggableElement
+        enabled={draggable}
+        scale={scale}
         style={{
           position: "absolute",
           bottom: 40,
           left: 40,
           right: 40,
-          backgroundColor: "rgba(255, 255, 255, 0.92)",
-          borderRadius: 24,
-          padding: "48px 56px",
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: 40,
         }}
       >
-        <h1
+        <div
           style={{
-            color: "#1A1A2E",
-            fontSize: 68,
-            fontWeight: 700,
-            lineHeight: 1.1,
-            margin: 0,
-            flex: 1,
+            backgroundColor: "rgba(255, 255, 255, 0.92)",
+            borderRadius: 24,
+            padding: "48px 56px",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 40,
           }}
         >
-          {title}
-        </h1>
-
-        {logoUrl && (
-          <img
-            src={logoUrl}
-            alt="Logo"
+          <h1
             style={{
-              maxWidth: 100,
-              maxHeight: 50,
-              objectFit: "contain",
-              flexShrink: 0,
+              color: "#1A1A2E",
+              fontSize: 68,
+              fontWeight: 700,
+              lineHeight: 1.1,
+              margin: 0,
+              flex: 1,
             }}
-            crossOrigin="anonymous"
-          />
-        )}
-      </div>
+          >
+            {title}
+          </h1>
+
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              alt="Logo"
+              style={{
+                maxWidth: 100,
+                maxHeight: 50,
+                objectFit: "contain",
+                flexShrink: 0,
+              }}
+              crossOrigin="anonymous"
+            />
+          )}
+        </div>
+      </DraggableElement>
     </div>
   );
 }
