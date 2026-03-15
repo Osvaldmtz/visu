@@ -94,6 +94,7 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
       <DraggableElement
         enabled={draggable}
         scale={scale}
+        onDragChange={onDragChange}
         style={{
           position: "absolute",
           bottom: 80,

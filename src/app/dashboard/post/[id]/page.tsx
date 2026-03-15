@@ -90,6 +90,31 @@ export default function PostReviewPage() {
     router.refresh();
   };
 
+  const handleDiscard = async () => {
+    if (!post) return;
+    setLoading("DISCARDED");
+    const supabase = createClient();
+
+    // Delete PNG from Storage
+    if (post.image_url && post.image_url.includes("/storage/v1/object/public/posts/")) {
+      const path = post.image_url.split("/storage/v1/object/public/posts/")[1];
+      if (path) {
+        await supabase.storage.from("posts").remove([decodeURIComponent(path)]);
+      }
+    }
+
+    // Delete topic so it becomes available again
+    if (post.title) {
+      await supabase.from("post_topics").delete().eq("brand_id", post.brand_id).eq("topic", post.title);
+    }
+
+    // Delete post record
+    await supabase.from("posts").delete().eq("id", post.id);
+
+    router.push("/dashboard");
+    router.refresh();
+  };
+
   const handleSchedule = async () => {
     if (!scheduleDate) return;
     setLoading("SCHEDULE");
@@ -458,11 +483,11 @@ export default function PostReviewPage() {
               )}
               {!isPublished && (
                 <button
-                  onClick={() => updateStatus("DISCARDED")}
+                  onClick={handleDiscard}
                   disabled={!!loading}
                   className="flex-1 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 font-medium py-3 rounded-lg transition-colors text-sm"
                 >
-                  {loading === "DISCARDED" ? "..." : "Descartar"}
+                  {loading === "DISCARDED" ? "Eliminando..." : "Descartar"}
                 </button>
               )}
             </div>
