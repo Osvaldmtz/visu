@@ -39,6 +39,7 @@ export default function AutoGenerate({
 }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const cancelledRef = useRef(false);
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState("");
   const [pendingRender, setPendingRender] = useState<PendingPost | null>(null);
@@ -50,26 +51,21 @@ export default function AutoGenerate({
     return layouts[Math.floor(Math.random() * layouts.length)];
   }, [brand.active_layouts]);
 
-  const getLogoUrl = useCallback(
-    (layout: number) =>
-      layout <= 1
-        ? brand.logo_light_url || brand.logo_url || ""
-        : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "",
-    [brand]
-  );
-
   // Process one post from the render queue
   useEffect(() => {
     if (!pendingRender) return;
-    let cancelled = false;
+    let localCancelled = false;
 
     const captureAndUpload = async () => {
       setStatus("rendering");
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       await new Promise((r) => setTimeout(r, 800));
 
-      if (cancelled || !canvasRef.current) {
-        if (!cancelled) { setError("Canvas not found"); setStatus("error"); }
+      if (localCancelled || cancelledRef.current || !canvasRef.current) {
+        if (!localCancelled && !cancelledRef.current) {
+          setError("Canvas not found");
+          setStatus("error");
+        }
         return;
       }
 
@@ -99,14 +95,20 @@ export default function AutoGenerate({
         setPendingRender(null);
         setProgress((p) => ({ ...p, current: p.current + 1 }));
 
-        // Process next in queue
+        // Check if cancelled before processing next
+        if (cancelledRef.current) {
+          setStatus("done");
+          router.refresh();
+          setTimeout(() => setStatus("idle"), 1500);
+          return;
+        }
+
         setQueue((q) => {
           if (q.length > 0) {
             const [next, ...rest] = q;
             setTimeout(() => setPendingRender(next), 100);
             return rest;
           }
-          // All done
           setStatus("done");
           router.refresh();
           setTimeout(() => setStatus("idle"), 1500);
@@ -122,7 +124,7 @@ export default function AutoGenerate({
     };
 
     captureAndUpload();
-    return () => { cancelled = true; };
+    return () => { localCancelled = true; };
   }, [pendingRender, brand.id, router]);
 
   const generateOnePost = async (logoDataUrl: string, layout: number): Promise<PendingPost> => {
@@ -154,9 +156,11 @@ export default function AutoGenerate({
   };
 
   const handleGenerate = async () => {
+    cancelledRef.current = false;
     setStatus("generating");
     setError("");
 
+    // posts_per_week × 4 weeks = total posts for the month
     const totalPosts = mode === "batch" ? (brand.posts_per_week ?? 1) * 4 : 1;
     setProgress({ current: 0, total: totalPosts });
 
@@ -169,15 +173,24 @@ export default function AutoGenerate({
         darkLogo ? toDataUrl(darkLogo) : Promise.resolve(""),
       ]);
 
-      // Generate all posts content (sequentially to respect topic dedup)
+      // Generate all posts content sequentially (respects topic dedup + cancel)
       const posts: PendingPost[] = [];
       for (let i = 0; i < totalPosts; i++) {
+        if (cancelledRef.current) break;
         setStatus(`generating ${i + 1}/${totalPosts}`);
         const layout = pickLayout();
         const logoDataUrl = layout <= 1 ? lightDataUrl : darkDataUrl;
         const post = await generateOnePost(logoDataUrl, layout);
         posts.push(post);
       }
+
+      if (cancelledRef.current && posts.length === 0) {
+        setStatus("idle");
+        return;
+      }
+
+      // Update total to actual generated count (may be less if cancelled)
+      setProgress({ current: 0, total: posts.length });
 
       // Start rendering pipeline
       const [first, ...rest] = posts;
@@ -188,6 +201,12 @@ export default function AutoGenerate({
       setError(e.message);
       setStatus("error");
     }
+  };
+
+  const handleCancel = () => {
+    cancelledRef.current = true;
+    setQueue([]);
+    // Let current in-flight post finish, then stop
   };
 
   const isWorking = status !== "idle" && status !== "done" && status !== "error";
@@ -205,7 +224,7 @@ export default function AutoGenerate({
     : label ?? (mode === "batch" ? "Generar parrilla" : "Crear post");
 
   return (
-    <>
+    <div className="flex items-center gap-2">
       <button
         onClick={handleGenerate}
         disabled={isWorking}
@@ -224,8 +243,17 @@ export default function AutoGenerate({
         {buttonLabel}
       </button>
 
+      {isWorking && (
+        <button
+          onClick={handleCancel}
+          className="text-xs text-red-400 hover:text-red-300 px-3 py-2 transition-colors"
+        >
+          Cancelar
+        </button>
+      )}
+
       {status === "error" && (
-        <p className="text-xs text-red-400 mt-1">{error}</p>
+        <p className="text-xs text-red-400">{error}</p>
       )}
 
       {pendingRender && (
@@ -244,6 +272,6 @@ export default function AutoGenerate({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
