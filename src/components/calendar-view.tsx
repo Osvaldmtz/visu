@@ -97,7 +97,7 @@ function MonthGrid({
                 {dayPosts.map((post) => (
                   <button
                     key={post.id}
-                    onClick={(e) => onPostAction(post, e)}
+                    onClick={(e) => { e.stopPropagation(); onPostAction(post, e); }}
                     className="flex items-center gap-1 p-0.5 rounded hover:bg-white/10 transition-colors w-full text-left"
                   >
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[post.status] ?? "bg-neutral-500"}`} />
