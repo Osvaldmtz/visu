@@ -6,6 +6,7 @@ import AutoGenerate from "@/components/auto-generate";
 import CleanupButton from "@/components/cleanup-button";
 import ViewToggle from "@/components/view-toggle";
 import CalendarView from "@/components/calendar-view";
+import BulkSchedule from "@/components/bulk-schedule";
 
 export default async function DashboardPage({
   searchParams,
@@ -75,6 +76,7 @@ export default async function DashboardPage({
                 {posts?.length ?? 0} posts generated
               </p>
               <CleanupButton brandId={brand.id} count={cleanupCount} />
+              <BulkSchedule posts={posts ?? []} brand={brand} />
             </div>
           </div>
           <div className="flex items-center gap-3">
