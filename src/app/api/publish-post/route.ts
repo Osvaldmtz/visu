@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-  const { postId, apiKey } = await request.json();
+  const { postId, apiKey, publishNow } = await request.json();
 
   const supabase = await createClient();
   const cronSecret = process.env.CRON_SECRET;
@@ -13,16 +13,16 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-    return await publishPost(admin, postId);
+    return await publishPost(admin, postId, false);
   }
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  return await publishPost(supabase, postId);
+  return await publishPost(supabase, postId, !!publishNow);
 }
 
-async function publishPost(supabase: any, postId: string) {
+async function publishPost(supabase: any, postId: string, immediate: boolean) {
   const { data: post } = await supabase
     .from("posts")
     .select("*, brands(*)")
@@ -67,7 +67,8 @@ async function publishPost(supabase: any, postId: string) {
   };
 
   // If scheduled_at is in the future, include it
-  if (post.scheduled_at) {
+  // Only include scheduled_at for non-immediate publishes
+  if (!immediate && post.scheduled_at) {
     const scheduledDate = new Date(post.scheduled_at);
     if (scheduledDate > new Date()) {
       body.scheduled_at = scheduledDate.toISOString();

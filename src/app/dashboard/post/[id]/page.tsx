@@ -178,7 +178,7 @@ export default function PostReviewPage() {
       const res = await fetch("/api/publish-post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId: post.id }),
+        body: JSON.stringify({ postId: post.id, publishNow: true }),
       });
       if (!res.ok) {
         const err = await res.json();
