@@ -120,6 +120,7 @@ export default function TemplateEditor({
         height: 1080,
         pixelRatio: 1,
         cacheBust: true,
+        style: { transform: "none" },
       });
       const res = await fetch(dataUrl);
       return await res.blob();

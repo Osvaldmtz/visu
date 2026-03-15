@@ -29,9 +29,9 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     scheduledAt: string | null;
     logoDataUrl: string;
     bgDataUrl: string;
+    backgroundUrl: string;
   } | null>(null);
 
-  // Pick layout — randomly from all active layouts
   const pickLayout = useCallback(() => {
     const layouts = brand.active_layouts ?? [0];
     return layouts[Math.floor(Math.random() * layouts.length)];
@@ -45,7 +45,6 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     [brand]
   );
 
-  // When pendingRender is set, wait for React to paint, then capture + upload
   useEffect(() => {
     if (!pendingRender) return;
     let cancelled = false;
@@ -53,7 +52,6 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     const captureAndUpload = async () => {
       setStatus("rendering");
 
-      // Wait for React to paint + images to decode
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       await new Promise((r) => setTimeout(r, 800));
 
@@ -85,8 +83,9 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         if (pendingRender.subtitle) {
           formData.append("subtitle", pendingRender.subtitle);
         }
-        if (pendingRender.bgDataUrl) {
-          formData.append("background_url", pendingRender.bgDataUrl);
+        // Save original URL (not data URL) for background
+        if (pendingRender.backgroundUrl) {
+          formData.append("background_url", pendingRender.backgroundUrl);
         }
         if (pendingRender.scheduledAt) {
           formData.append("scheduled_at", pendingRender.scheduledAt);
@@ -125,11 +124,9 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
     const layout = pickLayout();
 
     try {
-      // 1. Pre-load logo as data URL
       const logoSrc = getLogoUrl(layout);
       const logoDataUrl = logoSrc ? await toDataUrl(logoSrc) : "";
 
-      // 2. Generate content with AI (includes Unsplash search server-side)
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -143,13 +140,12 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
 
       const data = await res.json();
 
-      // 3. Pre-load background photo as data URL if present
       let bgDataUrl = "";
-      if (data.backgroundUrl) {
-        bgDataUrl = await toDataUrl(data.backgroundUrl);
+      const backgroundUrl = data.backgroundUrl ?? "";
+      if (backgroundUrl) {
+        bgDataUrl = await toDataUrl(backgroundUrl);
       }
 
-      // 4. Trigger render
       setPendingRender({
         layout,
         title: data.title ?? "",
@@ -158,6 +154,7 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         scheduledAt: data.scheduled_at ?? null,
         logoDataUrl,
         bgDataUrl,
+        backgroundUrl,
       });
     } catch (e: any) {
       console.error("Generate error:", e);
@@ -199,7 +196,7 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         <p className="text-xs text-red-400 mt-1">{error}</p>
       )}
 
-      {/* Off-screen canvas */}
+      {/* Off-screen canvas at full 1080x1080 — NO transform */}
       {pendingRender && (
         <div
           style={{

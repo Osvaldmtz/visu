@@ -156,6 +156,7 @@ export default function PostReviewPage() {
         height: 1080,
         pixelRatio: 1,
         cacheBust: true,
+        style: { transform: "none" },
       });
 
       const blobRes = await fetch(dataUrl);
@@ -204,6 +205,7 @@ export default function PostReviewPage() {
         height: 1080,
         pixelRatio: 1,
         cacheBust: true,
+        style: { transform: "none" },
       });
 
       const blobRes = await fetch(dataUrl);
