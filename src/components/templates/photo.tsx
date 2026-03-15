@@ -7,6 +7,7 @@ interface PhotoProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
+  onDragChange?: () => void;
 }
 
 export default function PhotoTemplate({
@@ -15,6 +16,7 @@ export default function PhotoTemplate({
   backgroundUrl,
   draggable,
   scale,
+  onDragChange,
 }: PhotoProps) {
   return (
     <div
@@ -54,6 +56,7 @@ export default function PhotoTemplate({
       <DraggableElement
         enabled={draggable}
         scale={scale}
+        onDragChange={onDragChange}
         style={{
           position: "absolute",
           bottom: 40,

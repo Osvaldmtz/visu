@@ -9,6 +9,7 @@ interface SplitProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
+  onDragChange?: () => void;
 }
 
 export default function SplitTemplate({
@@ -19,6 +20,7 @@ export default function SplitTemplate({
   backgroundUrl,
   draggable,
   scale,
+  onDragChange,
 }: SplitProps) {
   return (
     <div
@@ -46,6 +48,7 @@ export default function SplitTemplate({
           <DraggableElement
             enabled={draggable}
             scale={scale}
+            onDragChange={onDragChange}
             style={{
               position: "absolute",
               top: 60,
@@ -91,6 +94,7 @@ export default function SplitTemplate({
           <DraggableElement
             enabled={draggable}
             scale={scale}
+            onDragChange={onDragChange}
             style={{
               position: "absolute",
               bottom: 60,

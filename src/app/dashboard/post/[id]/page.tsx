@@ -25,6 +25,8 @@ export default function PostReviewPage() {
   const [bgDataUrl, setBgDataUrl] = useState("");
   const [resetKey, setResetKey] = useState(0);
   const [interactive, setInteractive] = useState(false);
+  const [hasDragChanges, setHasDragChanges] = useState(false);
+  const [savingPosition, setSavingPosition] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -139,6 +141,53 @@ export default function PostReviewPage() {
       setLoading("");
     }
   };
+
+  // Save position: re-export PNG with new drag positions, keep current status
+  const handleSavePosition = useCallback(async () => {
+    if (!canvasRef.current || !brand || !post) return;
+    setSavingPosition(true);
+
+    try {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 400));
+
+      const dataUrl = await toPng(canvasRef.current, {
+        width: 1080,
+        height: 1080,
+        pixelRatio: 1,
+        cacheBust: true,
+      });
+
+      const blobRes = await fetch(dataUrl);
+      const blob = await blobRes.blob();
+
+      const formData = new FormData();
+      formData.append("file", blob, `post-${Date.now()}.png`);
+      formData.append("brandId", brand.id);
+      formData.append("layout", String(post.layout));
+      formData.append("title", post.title);
+      formData.append("caption", caption);
+      formData.append("postId", post.id);
+      formData.append("status", post.status);
+      if (post.subtitle) formData.append("subtitle", post.subtitle);
+      if (post.background_url) formData.append("background_url", post.background_url);
+
+      const uploadRes = await fetch("/api/approve-post", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) throw new Error("Save failed");
+
+      const result = await uploadRes.json();
+      setPost({ ...post, image_url: result.imageUrl });
+      setHasDragChanges(false);
+    } catch (e: any) {
+      console.error("Save position error:", e);
+    } finally {
+      setSavingPosition(false);
+    }
+  }, [brand, post, caption]);
 
   // Approve with re-export: capture current interactive template as PNG
   const handleApproveWithExport = useCallback(async () => {
@@ -268,6 +317,7 @@ export default function PostReviewPage() {
     backgroundUrl: bgDataUrl || undefined,
     draggable: true,
     scale,
+    onDragChange: () => setHasDragChanges(true),
   };
 
   return (
@@ -313,9 +363,18 @@ export default function PostReviewPage() {
               </div>
             )}
             {interactive && !isPublished && (
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-3 flex-wrap">
+                {hasDragChanges && (
+                  <button
+                    onClick={handleSavePosition}
+                    disabled={savingPosition}
+                    className="text-xs bg-accent hover:bg-accent/90 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg transition-colors font-medium"
+                  >
+                    {savingPosition ? "Guardando..." : "Guardar posicion"}
+                  </button>
+                )}
                 <button
-                  onClick={() => setResetKey((k) => k + 1)}
+                  onClick={() => { setResetKey((k) => k + 1); setHasDragChanges(false); }}
                   className="text-xs text-neutral-400 hover:text-white px-3 py-1.5 border border-surface-border rounded-lg transition-colors"
                 >
                   Resetear posicion
@@ -383,7 +442,7 @@ export default function PostReviewPage() {
                   disabled={!!loading}
                   className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm"
                 >
-                  {loading === "APPROVED" ? "Exportando..." : "Aprobar"}
+                  {loading === "APPROVED" ? "Exportando..." : "Aprobar y publicar"}
                 </button>
               )}
               {!isPublished && (

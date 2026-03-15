@@ -12,54 +12,60 @@ export interface TemplateProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
+  onDragChange?: () => void;
 }
 
 export const TEMPLATE_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
 
 export function renderTemplate(layout: number, props: TemplateProps) {
+  const { onDragChange, ...rest } = props;
   switch (layout) {
     case 0:
       return (
         <OverlayTemplate
-          title={props.title}
-          logoUrl={props.logoUrl}
-          primaryColor={props.primaryColor}
-          backgroundUrl={props.backgroundUrl}
-          draggable={props.draggable}
-          scale={props.scale}
+          title={rest.title}
+          logoUrl={rest.logoUrl}
+          primaryColor={rest.primaryColor}
+          backgroundUrl={rest.backgroundUrl}
+          draggable={rest.draggable}
+          scale={rest.scale}
+          onDragChange={onDragChange}
         />
       );
     case 1:
       return (
         <SplitTemplate
-          title={props.title}
-          subtitle={props.subtitle ?? ""}
-          logoUrl={props.logoUrl}
-          primaryColor={props.primaryColor}
-          backgroundUrl={props.backgroundUrl}
-          draggable={props.draggable}
-          scale={props.scale}
+          title={rest.title}
+          subtitle={rest.subtitle ?? ""}
+          logoUrl={rest.logoUrl}
+          primaryColor={rest.primaryColor}
+          backgroundUrl={rest.backgroundUrl}
+          draggable={rest.draggable}
+          scale={rest.scale}
+          onDragChange={onDragChange}
         />
       );
     case 2:
       return (
         <MinimalTemplate
-          title={props.title}
-          subtitle={props.subtitle ?? ""}
-          logoUrl={props.logoUrl}
-          primaryColor={props.primaryColor}
-          draggable={props.draggable}
-          scale={props.scale}
+          title={rest.title}
+          subtitle={rest.subtitle ?? ""}
+          logoUrl={rest.logoUrl}
+          primaryColor={rest.primaryColor}
+          draggable={rest.draggable}
+          scale={rest.scale}
+          onDragChange={onDragChange}
         />
       );
     case 3:
       return (
         <PhotoTemplate
-          title={props.title}
-          logoUrl={props.logoUrl}
-          backgroundUrl={props.backgroundUrl}
-          draggable={props.draggable}
-          scale={props.scale}
+          title={rest.title}
+          logoUrl={rest.logoUrl}
+          backgroundUrl={rest.backgroundUrl}
+          draggable={rest.draggable}
+          scale={rest.scale}
+          onDragChange={onDragChange}
         />
       );
     default:

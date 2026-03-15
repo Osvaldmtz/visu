@@ -8,6 +8,7 @@ interface MinimalProps {
   primaryColor: string;
   draggable?: boolean;
   scale?: number;
+  onDragChange?: () => void;
 }
 
 export default function MinimalTemplate({
@@ -17,6 +18,7 @@ export default function MinimalTemplate({
   primaryColor,
   draggable,
   scale,
+  onDragChange,
 }: MinimalProps) {
   return (
     <div
@@ -45,6 +47,7 @@ export default function MinimalTemplate({
       <DraggableElement
         enabled={draggable}
         scale={scale}
+        onDragChange={onDragChange}
         style={{
           position: "absolute",
           top: 120,

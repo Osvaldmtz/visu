@@ -8,9 +8,10 @@ interface OverlayProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
+  onDragChange?: () => void;
 }
 
-export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, draggable, scale }: OverlayProps) {
+export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, draggable, scale, onDragChange }: OverlayProps) {
   return (
     <div
       style={{
@@ -73,6 +74,7 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
         <DraggableElement
           enabled={draggable}
           scale={scale}
+          onDragChange={onDragChange}
           style={{
             position: "absolute",
             top: 60,

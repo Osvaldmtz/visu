@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import Draggable, { DraggableData, DraggableEvent } from "react-draggable";
+import Draggable from "react-draggable";
 
 interface DraggableElementProps {
   children: React.ReactNode;
   enabled?: boolean;
   scale?: number;
   style?: React.CSSProperties;
+  onDragChange?: () => void;
 }
 
 export default function DraggableElement({
@@ -15,6 +16,7 @@ export default function DraggableElement({
   enabled = false,
   scale = 1,
   style,
+  onDragChange,
 }: DraggableElementProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -30,7 +32,10 @@ export default function DraggableElement({
       bounds="parent"
       scale={scale}
       onStart={() => setDragging(true)}
-      onStop={() => setDragging(false)}
+      onStop={() => {
+        setDragging(false);
+        onDragChange?.();
+      }}
     >
       <div
         ref={nodeRef}
