@@ -4,13 +4,13 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toPng } from "html-to-image";
-import { renderTemplate } from "@/components/templates";
+import { renderTemplate, type ElementPositions } from "@/components/templates";
 import { toDataUrl } from "@/lib/image-utils";
 
 export default function PostReviewPage() {
   const { id } = useParams();
   const router = useRouter();
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
   const regenCanvasRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [post, setPost] = useState<any>(null);
@@ -27,6 +27,7 @@ export default function PostReviewPage() {
   const [interactive, setInteractive] = useState(false);
   const [hasDragChanges, setHasDragChanges] = useState(false);
   const [savingPosition, setSavingPosition] = useState(false);
+  const [positions, setPositions] = useState<ElementPositions>({});
 
   useEffect(() => {
     const load = async () => {
@@ -39,6 +40,9 @@ export default function PostReviewPage() {
       if (postData) {
         setPost(postData);
         setCaption(postData.caption);
+        if (postData.element_positions) {
+          setPositions(postData.element_positions);
+        }
         if (postData.scheduled_at) {
           const d = new Date(postData.scheduled_at);
           setScheduleDate(d.toISOString().split("T")[0]);
@@ -51,18 +55,13 @@ export default function PostReviewPage() {
           .single();
         setBrand(brandData);
 
-        // If post has template data, enable interactive mode
         if (brandData && postData.title) {
           const logoSrc =
             postData.layout <= 1
               ? brandData.logo_light_url || brandData.logo_url || ""
               : brandData.logo_dark_url || brandData.logo_light_url || brandData.logo_url || "";
-          if (logoSrc) {
-            toDataUrl(logoSrc).then(setLogoDataUrl);
-          }
-          if (postData.background_url) {
-            toDataUrl(postData.background_url).then(setBgDataUrl);
-          }
+          if (logoSrc) toDataUrl(logoSrc).then(setLogoDataUrl);
+          if (postData.background_url) toDataUrl(postData.background_url).then(setBgDataUrl);
           setInteractive(true);
         }
       }
@@ -70,17 +69,18 @@ export default function PostReviewPage() {
     load();
   }, [id]);
 
-  // Scale the preview to fit the wrapper
   useEffect(() => {
     const update = () => {
-      if (wrapperRef.current) {
-        setScale(wrapperRef.current.offsetWidth / 1080);
-      }
+      if (wrapperRef.current) setScale(wrapperRef.current.offsetWidth / 1080);
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, [interactive]);
+
+  const handlePositionChange = useCallback((elementId: string, x: number, y: number) => {
+    setPositions((prev) => ({ ...prev, [elementId]: { x, y } }));
+  }, []);
 
   const updateStatus = async (status: string) => {
     setLoading(status);
@@ -103,6 +103,100 @@ export default function PostReviewPage() {
     router.refresh();
   };
 
+  // Capture the off-screen export canvas (full 1080x1080, no transform)
+  const captureExport = useCallback(async (): Promise<Blob | null> => {
+    if (!exportRef.current) return null;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise((r) => setTimeout(r, 500));
+
+    const dataUrl = await toPng(exportRef.current, {
+      width: 1080,
+      height: 1080,
+      pixelRatio: 1,
+      cacheBust: true,
+    });
+    const res = await fetch(dataUrl);
+    return await res.blob();
+  }, []);
+
+  const handleSavePosition = useCallback(async () => {
+    if (!brand || !post) return;
+    setSavingPosition(true);
+
+    try {
+      const blob = await captureExport();
+      if (!blob) throw new Error("Export failed");
+
+      const formData = new FormData();
+      formData.append("file", blob, `post-${Date.now()}.png`);
+      formData.append("brandId", brand.id);
+      formData.append("layout", String(post.layout));
+      formData.append("title", post.title);
+      formData.append("caption", caption);
+      formData.append("postId", post.id);
+      formData.append("status", post.status);
+      if (post.subtitle) formData.append("subtitle", post.subtitle);
+      if (post.background_url) formData.append("background_url", post.background_url);
+
+      const uploadRes = await fetch("/api/approve-post", {
+        method: "POST",
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error("Save failed");
+
+      const result = await uploadRes.json();
+
+      // Save positions to DB
+      const supabase = createClient();
+      await supabase.from("posts").update({ element_positions: positions }).eq("id", post.id);
+
+      setPost({ ...post, image_url: result.imageUrl, element_positions: positions });
+      setHasDragChanges(false);
+    } catch (e: any) {
+      console.error("Save position error:", e);
+    } finally {
+      setSavingPosition(false);
+    }
+  }, [brand, post, caption, positions, captureExport]);
+
+  const handleApproveWithExport = useCallback(async () => {
+    if (!brand || !post) return;
+    setLoading("APPROVED");
+
+    try {
+      const blob = await captureExport();
+      if (!blob) throw new Error("Export failed");
+
+      const formData = new FormData();
+      formData.append("file", blob, `post-${Date.now()}.png`);
+      formData.append("brandId", brand.id);
+      formData.append("layout", String(post.layout));
+      formData.append("title", post.title);
+      formData.append("caption", caption);
+      formData.append("postId", post.id);
+      formData.append("status", "APPROVED");
+      if (post.subtitle) formData.append("subtitle", post.subtitle);
+      if (post.background_url) formData.append("background_url", post.background_url);
+      if (scheduleDate) formData.append("scheduled_at", `${scheduleDate}T${scheduleTime}:00Z`);
+
+      const uploadRes = await fetch("/api/approve-post", {
+        method: "POST",
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+
+      // Save positions
+      const supabase = createClient();
+      await supabase.from("posts").update({ element_positions: positions }).eq("id", post.id);
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (e: any) {
+      console.error("Approve export error:", e);
+      setLoading("");
+    }
+  }, [brand, post, caption, scheduleDate, scheduleTime, positions, captureExport, router]);
+
   const handleRegenerate = async () => {
     if (!brand) return;
     setLoading("REGENERATE");
@@ -123,9 +217,7 @@ export default function PostReviewPage() {
       const data = await res.json();
 
       let bgDataUrlNew = "";
-      if (data.backgroundUrl) {
-        bgDataUrlNew = await toDataUrl(data.backgroundUrl);
-      }
+      if (data.backgroundUrl) bgDataUrlNew = await toDataUrl(data.backgroundUrl);
 
       setRegenData({
         title: data.title ?? "",
@@ -142,105 +234,6 @@ export default function PostReviewPage() {
     }
   };
 
-  // Save position: re-export PNG with new drag positions, keep current status
-  const handleSavePosition = useCallback(async () => {
-    if (!canvasRef.current || !brand || !post) return;
-    setSavingPosition(true);
-
-    try {
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 400));
-
-      const dataUrl = await toPng(canvasRef.current, {
-        width: 1080,
-        height: 1080,
-        pixelRatio: 1,
-        cacheBust: true,
-        style: { transform: "none" },
-      });
-
-      const blobRes = await fetch(dataUrl);
-      const blob = await blobRes.blob();
-
-      const formData = new FormData();
-      formData.append("file", blob, `post-${Date.now()}.png`);
-      formData.append("brandId", brand.id);
-      formData.append("layout", String(post.layout));
-      formData.append("title", post.title);
-      formData.append("caption", caption);
-      formData.append("postId", post.id);
-      formData.append("status", post.status);
-      if (post.subtitle) formData.append("subtitle", post.subtitle);
-      if (post.background_url) formData.append("background_url", post.background_url);
-
-      const uploadRes = await fetch("/api/approve-post", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadRes.ok) throw new Error("Save failed");
-
-      const result = await uploadRes.json();
-      setPost({ ...post, image_url: result.imageUrl });
-      setHasDragChanges(false);
-    } catch (e: any) {
-      console.error("Save position error:", e);
-    } finally {
-      setSavingPosition(false);
-    }
-  }, [brand, post, caption]);
-
-  // Approve with re-export: capture current interactive template as PNG
-  const handleApproveWithExport = useCallback(async () => {
-    if (!canvasRef.current || !brand || !post) return;
-    setLoading("APPROVED");
-
-    try {
-      // Wait for rendering
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 400));
-
-      const dataUrl = await toPng(canvasRef.current, {
-        width: 1080,
-        height: 1080,
-        pixelRatio: 1,
-        cacheBust: true,
-        style: { transform: "none" },
-      });
-
-      const blobRes = await fetch(dataUrl);
-      const blob = await blobRes.blob();
-
-      const formData = new FormData();
-      formData.append("file", blob, `post-${Date.now()}.png`);
-      formData.append("brandId", brand.id);
-      formData.append("layout", String(post.layout));
-      formData.append("title", post.title);
-      formData.append("caption", caption);
-      formData.append("postId", post.id);
-      formData.append("status", "APPROVED");
-      if (post.subtitle) formData.append("subtitle", post.subtitle);
-      if (post.background_url) formData.append("background_url", post.background_url);
-      if (scheduleDate) {
-        formData.append("scheduled_at", `${scheduleDate}T${scheduleTime}:00Z`);
-      }
-
-      const uploadRes = await fetch("/api/approve-post", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadRes.ok) throw new Error("Upload failed");
-
-      router.push("/dashboard");
-      router.refresh();
-    } catch (e: any) {
-      console.error("Approve export error:", e);
-      setLoading("");
-    }
-  }, [brand, post, caption, scheduleDate, scheduleTime, router]);
-
-  // Regeneration capture & upload
   useEffect(() => {
     if (!regenData || !brand || !post) return;
     let cancelled = false;
@@ -256,12 +249,8 @@ export default function PostReviewPage() {
 
       try {
         const dataUrl = await toPng(regenCanvasRef.current, {
-          width: 1080,
-          height: 1080,
-          pixelRatio: 1,
-          cacheBust: true,
+          width: 1080, height: 1080, pixelRatio: 1, cacheBust: true,
         });
-
         const blobRes = await fetch(dataUrl);
         const blob = await blobRes.blob();
 
@@ -275,16 +264,14 @@ export default function PostReviewPage() {
         formData.append("status", "DRAFT");
         if (regenData.subtitle) formData.append("subtitle", regenData.subtitle);
         if (regenData.backgroundUrl) formData.append("background_url", regenData.backgroundUrl);
-        if (regenData.scheduledAt) {
-          formData.append("scheduled_at", regenData.scheduledAt);
-        }
+        if (regenData.scheduledAt) formData.append("scheduled_at", regenData.scheduledAt);
 
-        const uploadRes = await fetch("/api/approve-post", {
-          method: "POST",
-          body: formData,
-        });
-
+        const uploadRes = await fetch("/api/approve-post", { method: "POST", body: formData });
         if (!uploadRes.ok) throw new Error("Upload failed");
+
+        // Reset positions on regen
+        const supabase = createClient();
+        await supabase.from("posts").update({ element_positions: {} }).eq("id", post.id);
 
         setRegenData(null);
         router.push("/dashboard");
@@ -311,15 +298,27 @@ export default function PostReviewPage() {
   const isScheduled = post.status === "SCHEDULED";
   const isPublished = post.status === "PUBLISHED";
 
-  const templateProps = {
+  const baseTemplateProps = {
     title: post.title,
     subtitle: post.subtitle ?? "",
     logoUrl: logoDataUrl || "",
     primaryColor: brand.primary_color ?? "#7C3DE3",
     backgroundUrl: bgDataUrl || undefined,
+  };
+
+  const previewProps = {
+    ...baseTemplateProps,
     draggable: true,
     scale,
     onDragChange: () => setHasDragChanges(true),
+    positions,
+    onPositionChange: handlePositionChange,
+  };
+
+  // Export props: same positions but no draggable, no scale
+  const exportProps = {
+    ...baseTemplateProps,
+    positions,
   };
 
   return (
@@ -333,7 +332,6 @@ export default function PostReviewPage() {
         </button>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Preview — interactive template or static image */}
           <div>
             {interactive && !isPublished ? (
               <div
@@ -342,7 +340,6 @@ export default function PostReviewPage() {
                 style={{ aspectRatio: "1/1" }}
               >
                 <div
-                  ref={canvasRef}
                   key={resetKey}
                   style={{
                     width: 1080,
@@ -354,7 +351,7 @@ export default function PostReviewPage() {
                     left: 0,
                   }}
                 >
-                  {renderTemplate(post.layout, templateProps)}
+                  {renderTemplate(post.layout, previewProps)}
                 </div>
               </div>
             ) : (
@@ -376,7 +373,7 @@ export default function PostReviewPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => { setResetKey((k) => k + 1); setHasDragChanges(false); }}
+                  onClick={() => { setResetKey((k) => k + 1); setPositions({}); setHasDragChanges(false); }}
                   className="text-xs text-neutral-400 hover:text-white px-3 py-1.5 border border-surface-border rounded-lg transition-colors"
                 >
                   Resetear posicion
@@ -406,32 +403,16 @@ export default function PostReviewPage() {
               className="bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent mb-4 flex-1 disabled:opacity-50"
             />
 
-            {/* Schedule section */}
             {!isPublished && (
               <div className="mb-4 p-4 bg-surface-light border border-surface-border rounded-lg">
                 <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
                   Programar publicacion
                 </label>
                 <div className="flex gap-2 mb-3">
-                  <input
-                    type="date"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                    className="flex-1 bg-surface border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
-                  />
-                  <input
-                    type="time"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-28 bg-surface border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
-                  />
+                  <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} min={new Date().toISOString().split("T")[0]} className="flex-1 bg-surface border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent" />
+                  <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="w-28 bg-surface border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent" />
                 </div>
-                <button
-                  onClick={handleSchedule}
-                  disabled={!scheduleDate || !!loading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-                >
+                <button onClick={handleSchedule} disabled={!scheduleDate || !!loading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
                   {loading === "SCHEDULE" ? "..." : isScheduled ? "Reprogramar" : "Programar"}
                 </button>
               </div>
@@ -439,29 +420,17 @@ export default function PostReviewPage() {
 
             <div className="flex gap-3">
               {!isPublished && (
-                <button
-                  onClick={interactive ? handleApproveWithExport : () => updateStatus("APPROVED")}
-                  disabled={!!loading}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm"
-                >
+                <button onClick={interactive ? handleApproveWithExport : () => updateStatus("APPROVED")} disabled={!!loading} className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm">
                   {loading === "APPROVED" ? "Exportando..." : "Aprobar y publicar"}
                 </button>
               )}
               {!isPublished && (
-                <button
-                  onClick={handleRegenerate}
-                  disabled={!!loading}
-                  className="flex-1 bg-surface-light hover:bg-surface-border disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm border border-surface-border"
-                >
+                <button onClick={handleRegenerate} disabled={!!loading} className="flex-1 bg-surface-light hover:bg-surface-border disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm border border-surface-border">
                   {loading === "REGENERATE" ? "Regenerando..." : "Regenerar"}
                 </button>
               )}
               {!isPublished && (
-                <button
-                  onClick={() => updateStatus("DISCARDED")}
-                  disabled={!!loading}
-                  className="flex-1 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 font-medium py-3 rounded-lg transition-colors text-sm"
-                >
+                <button onClick={() => updateStatus("DISCARDED")} disabled={!!loading} className="flex-1 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 font-medium py-3 rounded-lg transition-colors text-sm">
                   {loading === "DISCARDED" ? "..." : "Descartar"}
                 </button>
               )}
@@ -470,22 +439,18 @@ export default function PostReviewPage() {
         </div>
       </div>
 
+      {/* Off-screen export canvas: full 1080x1080, NO transform, same positions */}
+      {interactive && !isPublished && (
+        <div style={{ position: "fixed", left: -9999, top: -9999, width: 1080, height: 1080, overflow: "hidden", pointerEvents: "none" }} aria-hidden="true">
+          <div ref={exportRef} style={{ width: 1080, height: 1080 }}>
+            {renderTemplate(post.layout, exportProps)}
+          </div>
+        </div>
+      )}
+
       {/* Off-screen canvas for regeneration */}
       {regenData && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: 1080,
-            height: 1080,
-            overflow: "hidden",
-            pointerEvents: "none",
-            opacity: 0,
-            zIndex: -1,
-          }}
-          aria-hidden="true"
-        >
+        <div style={{ position: "fixed", left: -9999, top: -9999, width: 1080, height: 1080, overflow: "hidden", pointerEvents: "none" }} aria-hidden="true">
           <div ref={regenCanvasRef} style={{ width: 1080, height: 1080 }}>
             {renderTemplate(post.layout, {
               title: regenData.title,
