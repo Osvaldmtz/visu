@@ -10,6 +10,8 @@ export interface TemplateProps {
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
+  draggable?: boolean;
+  scale?: number;
 }
 
 export const TEMPLATE_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
@@ -23,6 +25,8 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           logoUrl={props.logoUrl}
           primaryColor={props.primaryColor}
           backgroundUrl={props.backgroundUrl}
+          draggable={props.draggable}
+          scale={props.scale}
         />
       );
     case 1:
@@ -33,6 +37,8 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           logoUrl={props.logoUrl}
           primaryColor={props.primaryColor}
           backgroundUrl={props.backgroundUrl}
+          draggable={props.draggable}
+          scale={props.scale}
         />
       );
     case 2:
@@ -42,6 +48,8 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           subtitle={props.subtitle ?? ""}
           logoUrl={props.logoUrl}
           primaryColor={props.primaryColor}
+          draggable={props.draggable}
+          scale={props.scale}
         />
       );
     case 3:
@@ -50,6 +58,8 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           title={props.title}
           logoUrl={props.logoUrl}
           backgroundUrl={props.backgroundUrl}
+          draggable={props.draggable}
+          scale={props.scale}
         />
       );
     default:

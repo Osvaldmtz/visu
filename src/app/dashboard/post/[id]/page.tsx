@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toPng } from "html-to-image";
@@ -11,6 +11,8 @@ export default function PostReviewPage() {
   const { id } = useParams();
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const regenCanvasRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [post, setPost] = useState<any>(null);
   const [brand, setBrand] = useState<any>(null);
   const [caption, setCaption] = useState("");
@@ -18,6 +20,11 @@ export default function PostReviewPage() {
   const [regenData, setRegenData] = useState<any>(null);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scale, setScale] = useState(0.5);
+  const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [bgDataUrl, setBgDataUrl] = useState("");
+  const [resetKey, setResetKey] = useState(0);
+  const [interactive, setInteractive] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -41,10 +48,37 @@ export default function PostReviewPage() {
           .eq("id", postData.brand_id)
           .single();
         setBrand(brandData);
+
+        // If post has template data, enable interactive mode
+        if (brandData && postData.title) {
+          const logoSrc =
+            postData.layout <= 1
+              ? brandData.logo_light_url || brandData.logo_url || ""
+              : brandData.logo_dark_url || brandData.logo_light_url || brandData.logo_url || "";
+          if (logoSrc) {
+            toDataUrl(logoSrc).then(setLogoDataUrl);
+          }
+          if (postData.background_url) {
+            toDataUrl(postData.background_url).then(setBgDataUrl);
+          }
+          setInteractive(true);
+        }
       }
     };
     load();
   }, [id]);
+
+  // Scale the preview to fit the wrapper
+  useEffect(() => {
+    const update = () => {
+      if (wrapperRef.current) {
+        setScale(wrapperRef.current.offsetWidth / 1080);
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [interactive]);
 
   const updateStatus = async (status: string) => {
     setLoading(status);
@@ -76,7 +110,7 @@ export default function PostReviewPage() {
         post.layout <= 1
           ? brand.logo_light_url || brand.logo_url || ""
           : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "";
-      const logoDataUrl = logoSrc ? await toDataUrl(logoSrc) : "";
+      const logoDataUrlNew = logoSrc ? await toDataUrl(logoSrc) : "";
 
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -86,9 +120,9 @@ export default function PostReviewPage() {
       if (!res.ok) throw new Error("Generation failed");
       const data = await res.json();
 
-      let bgDataUrl = "";
+      let bgDataUrlNew = "";
       if (data.backgroundUrl) {
-        bgDataUrl = await toDataUrl(data.backgroundUrl);
+        bgDataUrlNew = await toDataUrl(data.backgroundUrl);
       }
 
       setRegenData({
@@ -96,8 +130,9 @@ export default function PostReviewPage() {
         subtitle: data.subtitle ?? "",
         caption: data.caption ?? "",
         scheduledAt: data.scheduled_at ?? null,
-        logoDataUrl,
-        bgDataUrl,
+        logoDataUrl: logoDataUrlNew,
+        bgDataUrl: bgDataUrlNew,
+        backgroundUrl: data.backgroundUrl ?? "",
       });
     } catch (e: any) {
       console.error("Regenerate error:", e);
@@ -105,6 +140,56 @@ export default function PostReviewPage() {
     }
   };
 
+  // Approve with re-export: capture current interactive template as PNG
+  const handleApproveWithExport = useCallback(async () => {
+    if (!canvasRef.current || !brand || !post) return;
+    setLoading("APPROVED");
+
+    try {
+      // Wait for rendering
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 400));
+
+      const dataUrl = await toPng(canvasRef.current, {
+        width: 1080,
+        height: 1080,
+        pixelRatio: 1,
+        cacheBust: true,
+      });
+
+      const blobRes = await fetch(dataUrl);
+      const blob = await blobRes.blob();
+
+      const formData = new FormData();
+      formData.append("file", blob, `post-${Date.now()}.png`);
+      formData.append("brandId", brand.id);
+      formData.append("layout", String(post.layout));
+      formData.append("title", post.title);
+      formData.append("caption", caption);
+      formData.append("postId", post.id);
+      formData.append("status", "APPROVED");
+      if (post.subtitle) formData.append("subtitle", post.subtitle);
+      if (post.background_url) formData.append("background_url", post.background_url);
+      if (scheduleDate) {
+        formData.append("scheduled_at", `${scheduleDate}T${scheduleTime}:00Z`);
+      }
+
+      const uploadRes = await fetch("/api/approve-post", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) throw new Error("Upload failed");
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (e: any) {
+      console.error("Approve export error:", e);
+      setLoading("");
+    }
+  }, [brand, post, caption, scheduleDate, scheduleTime, router]);
+
+  // Regeneration capture & upload
   useEffect(() => {
     if (!regenData || !brand || !post) return;
     let cancelled = false;
@@ -113,13 +198,13 @@ export default function PostReviewPage() {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       await new Promise((r) => setTimeout(r, 800));
 
-      if (cancelled || !canvasRef.current) {
+      if (cancelled || !regenCanvasRef.current) {
         if (!cancelled) setLoading("");
         return;
       }
 
       try {
-        const dataUrl = await toPng(canvasRef.current, {
+        const dataUrl = await toPng(regenCanvasRef.current, {
           width: 1080,
           height: 1080,
           pixelRatio: 1,
@@ -137,6 +222,8 @@ export default function PostReviewPage() {
         formData.append("caption", regenData.caption);
         formData.append("postId", post.id);
         formData.append("status", "DRAFT");
+        if (regenData.subtitle) formData.append("subtitle", regenData.subtitle);
+        if (regenData.backgroundUrl) formData.append("background_url", regenData.backgroundUrl);
         if (regenData.scheduledAt) {
           formData.append("scheduled_at", regenData.scheduledAt);
         }
@@ -173,6 +260,16 @@ export default function PostReviewPage() {
   const isScheduled = post.status === "SCHEDULED";
   const isPublished = post.status === "PUBLISHED";
 
+  const templateProps = {
+    title: post.title,
+    subtitle: post.subtitle ?? "",
+    logoUrl: logoDataUrl || "",
+    primaryColor: brand.primary_color ?? "#7C3DE3",
+    backgroundUrl: bgDataUrl || undefined,
+    draggable: true,
+    scale,
+  };
+
   return (
     <div className="min-h-screen px-4 py-8">
       <div className="max-w-4xl mx-auto">
@@ -184,9 +281,49 @@ export default function PostReviewPage() {
         </button>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="aspect-square bg-surface-light rounded-xl overflow-hidden border border-surface-border">
-            {post.image_url && (
-              <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
+          {/* Preview — interactive template or static image */}
+          <div>
+            {interactive && !isPublished ? (
+              <div
+                ref={wrapperRef}
+                className="relative bg-neutral-900 rounded-xl overflow-hidden border border-surface-border"
+                style={{ aspectRatio: "1/1" }}
+              >
+                <div
+                  ref={canvasRef}
+                  key={resetKey}
+                  style={{
+                    width: 1080,
+                    height: 1080,
+                    transform: `scale(${scale})`,
+                    transformOrigin: "top left",
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                  }}
+                >
+                  {renderTemplate(post.layout, templateProps)}
+                </div>
+              </div>
+            ) : (
+              <div className="aspect-square bg-surface-light rounded-xl overflow-hidden border border-surface-border">
+                {post.image_url && (
+                  <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
+                )}
+              </div>
+            )}
+            {interactive && !isPublished && (
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => setResetKey((k) => k + 1)}
+                  className="text-xs text-neutral-400 hover:text-white px-3 py-1.5 border border-surface-border rounded-lg transition-colors"
+                >
+                  Resetear posicion
+                </button>
+                <span className="text-xs text-neutral-500 flex items-center">
+                  Arrastra los elementos para moverlos
+                </span>
+              </div>
             )}
           </div>
 
@@ -242,11 +379,11 @@ export default function PostReviewPage() {
             <div className="flex gap-3">
               {!isPublished && (
                 <button
-                  onClick={() => updateStatus("APPROVED")}
+                  onClick={interactive ? handleApproveWithExport : () => updateStatus("APPROVED")}
                   disabled={!!loading}
                   className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm"
                 >
-                  {loading === "APPROVED" ? "..." : "Aprobar"}
+                  {loading === "APPROVED" ? "Exportando..." : "Aprobar"}
                 </button>
               )}
               {!isPublished && (
@@ -288,7 +425,7 @@ export default function PostReviewPage() {
           }}
           aria-hidden="true"
         >
-          <div ref={canvasRef} style={{ width: 1080, height: 1080 }}>
+          <div ref={regenCanvasRef} style={{ width: 1080, height: 1080 }}>
             {renderTemplate(post.layout, {
               title: regenData.title,
               subtitle: regenData.subtitle,

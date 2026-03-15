@@ -11,6 +11,8 @@ export async function POST(request: Request) {
   const layout = formData.get("layout") as string;
   const title = formData.get("title") as string;
   const caption = formData.get("caption") as string;
+  const subtitle = formData.get("subtitle") as string | null;
+  const backgroundUrlField = formData.get("background_url") as string | null;
   const postId = formData.get("postId") as string | null;
   const scheduledAt = formData.get("scheduled_at") as string | null;
   const statusOverride = formData.get("status") as string | null;
@@ -67,6 +69,8 @@ export async function POST(request: Request) {
     caption: caption || "",
     title: title || "",
     status: statusOverride || "APPROVED",
+    subtitle: subtitle || null,
+    background_url: backgroundUrlField || null,
   };
 
   if (scheduledAt) {

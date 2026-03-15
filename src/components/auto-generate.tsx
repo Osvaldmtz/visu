@@ -82,6 +82,12 @@ export default function AutoGenerate({ brand }: { brand: Brand }) {
         formData.append("title", pendingRender.title);
         formData.append("caption", pendingRender.caption);
         formData.append("status", "DRAFT");
+        if (pendingRender.subtitle) {
+          formData.append("subtitle", pendingRender.subtitle);
+        }
+        if (pendingRender.bgDataUrl) {
+          formData.append("background_url", pendingRender.bgDataUrl);
+        }
         if (pendingRender.scheduledAt) {
           formData.append("scheduled_at", pendingRender.scheduledAt);
         }
