@@ -14,12 +14,11 @@ export default function EditorPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
-      const { data } = await supabase
-        .from("brands")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-      if (!data) { router.push("/onboarding"); return; }
+      // RLS returns all accessible brands (owned + assigned)
+      const { data: brands } = await supabase.from("brands").select("*");
+      if (!brands?.length) { router.push("/onboarding"); return; }
+      const activeBrandId = document.cookie.match(/visu-active-brand=([^;]+)/)?.[1];
+      const data = brands.find((b: any) => b.id === activeBrandId) ?? brands[0];
       setBrand(data);
     };
     load();

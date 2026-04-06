@@ -31,12 +31,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify user owns the brand
+  // Verify brand access (RLS handles ownership + collaborator access)
   const { data: brand } = await supabase
     .from("brands")
     .select("id")
     .eq("id", brandId)
-    .eq("user_id", user.id)
     .single();
 
   if (!brand) {

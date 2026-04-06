@@ -25,12 +25,11 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Verify brand ownership
+  // Verify brand access (RLS handles ownership + collaborator access)
   const { data: brand } = await supabase
     .from("brands")
     .select("id")
     .eq("id", brandId)
-    .eq("user_id", user.id)
     .single();
 
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });

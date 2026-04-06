@@ -67,6 +67,13 @@ export default function SettingsPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
+      // Check if collaborator — collaborators cannot access settings
+      const { data: collabRow } = await supabase
+        .from("collaborators")
+        .select("id")
+        .eq("id", user.id)
+        .single();
+      if (collabRow) { router.push("/dashboard"); return; }
       const { data } = await supabase
         .from("brands")
         .select("*")

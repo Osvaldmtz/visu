@@ -12,7 +12,6 @@ export async function POST(request: Request) {
     .from("brands")
     .select("name, industry, brand_skill")
     .eq("id", brandId)
-    .eq("user_id", user.id)
     .single();
 
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
