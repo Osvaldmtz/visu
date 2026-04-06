@@ -108,9 +108,11 @@ export default function OnboardingPage() {
     setActiveLayouts((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   const handleCreate = async () => {
     setSaving(true);
+    setCreateError("");
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -165,6 +167,7 @@ export default function OnboardingPage() {
       router.push("/dashboard");
     } catch (err) {
       console.error("Onboarding error:", err);
+      setCreateError(err instanceof Error ? err.message : "Error al crear la marca");
       setSaving(false);
     }
   };
@@ -296,13 +299,18 @@ export default function OnboardingPage() {
               Siguiente
             </button>
           ) : (
-            <button
-              onClick={handleCreate}
-              disabled={saving}
-              className="px-8 py-3 rounded-lg bg-accent hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              {saving ? "Guardando..." : "Crear mi marca"}
-            </button>
+            <div className="flex items-center gap-3">
+              {createError && (
+                <p className="text-red-400 text-sm">{createError}</p>
+              )}
+              <button
+                onClick={handleCreate}
+                disabled={saving}
+                className="px-8 py-3 rounded-lg bg-accent hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {saving ? "Guardando..." : "Crear mi marca"}
+              </button>
+            </div>
           )}
         </div>
       </div>
