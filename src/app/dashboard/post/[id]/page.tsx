@@ -16,6 +16,7 @@ export default function PostReviewPage() {
   const [post, setPost] = useState<any>(null);
   const [brand, setBrand] = useState<any>(null);
   const [caption, setCaption] = useState("");
+  const [title, setTitle] = useState("");
   const [loading, setLoading] = useState("");
   const [regenData, setRegenData] = useState<any>(null);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -49,6 +50,7 @@ export default function PostReviewPage() {
       if (postData) {
         setPost(postData);
         setCaption(postData.caption);
+        setTitle(postData.title || "");
         if (postData.scheduled_at) {
           const d = new Date(postData.scheduled_at);
           setScheduleDate(d.toISOString().split("T")[0]);
@@ -280,7 +282,7 @@ export default function PostReviewPage() {
       formData.append("file", blob, `post-${Date.now()}.png`);
       formData.append("brandId", brand.id);
       formData.append("layout", String(post.layout));
-      formData.append("title", post.title);
+      formData.append("title", title);
       formData.append("caption", caption);
       formData.append("postId", post.id);
       formData.append("status", post.status);
@@ -332,7 +334,7 @@ export default function PostReviewPage() {
       formData.append("file", blob, `post-${Date.now()}.png`);
       formData.append("brandId", brand.id);
       formData.append("layout", String(post.layout));
-      formData.append("title", post.title);
+      formData.append("title", title);
       formData.append("caption", caption);
       formData.append("postId", post.id);
       formData.append("status", "APPROVED");
@@ -437,7 +439,7 @@ export default function PostReviewPage() {
   };
 
   const templateProps = {
-    title: post.title,
+    title,
     subtitle: post.subtitle ?? "",
     logoUrl: logoDataUrl || "",
     primaryColor: brand.primary_color ?? "#7C3DE3",
@@ -562,7 +564,16 @@ export default function PostReviewPage() {
           </div>
 
           <div className="flex flex-col">
-            <h2 className="text-xl font-bold mb-1">{post.title}</h2>
+            {!isPublished ? (
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => { setTitle(e.target.value); setHasDragChanges(true); }}
+                className="text-xl font-bold mb-1 bg-transparent border-b border-transparent hover:border-surface-border focus:border-accent focus:outline-none transition-colors text-white w-full"
+              />
+            ) : (
+              <h2 className="text-xl font-bold mb-1">{title}</h2>
+            )}
             <span className="text-xs text-neutral-500 mb-4">
               Layout {post.layout} &middot; {post.status}
               {(post.status === "SCHEDULED" || post.status === "PUBLISHED") && post.scheduled_at && (
