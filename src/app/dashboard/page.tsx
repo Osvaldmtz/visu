@@ -143,7 +143,7 @@ export default async function DashboardPage({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {gridPosts.map((post) => (
                 <Link key={post.id} href={`/dashboard/post/${post.id}`}>
-                  <PostCard post={post} />
+                  <PostCard post={post} brand={brand} />
                 </Link>
               ))}
             </div>
