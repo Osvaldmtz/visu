@@ -195,21 +195,32 @@ export default function PostReviewPage() {
 
   const handlePublishNow = async () => {
     if (!post) return;
+    setPublishError("");
+    setPublishedMessage("");
+
+    if (!post.image_url) {
+      setPublishError("El post no tiene imagen. Genera o sube una imagen primero.");
+      return;
+    }
+
     setLoading("PUBLISH");
     try {
-      // Save caption first
+      // Save caption + title first
       const supabase = createClient();
-      await supabase.from("posts").update({ caption }).eq("id", id);
+      await supabase.from("posts").update({ caption, title }).eq("id", id);
 
       const res = await fetch("/api/publish-post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId: post.id, publishNow: true }),
       });
+
+      const data = await res.json();
+
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Publish failed");
+        throw new Error(data.error || `Error ${res.status}`);
       }
+
       setPublishedMessage("Publicado en Instagram y Facebook");
       setTimeout(() => {
         router.push("/dashboard");
@@ -217,7 +228,7 @@ export default function PostReviewPage() {
       }, 2000);
     } catch (e: any) {
       console.error("Publish error:", e);
-      setPublishError(e.message);
+      setPublishError(e.message || "Error desconocido al publicar");
       setLoading("");
     }
   };
@@ -709,7 +720,9 @@ export default function PostReviewPage() {
                   <p className="text-sm text-emerald-400 text-center">{publishedMessage}</p>
                 )}
                 {publishError && (
-                  <p className="text-xs text-red-400">{publishError}</p>
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <p className="text-sm text-red-400">{publishError}</p>
+                  </div>
                 )}
               </div>
             )}

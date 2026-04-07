@@ -23,15 +23,32 @@ export async function POST(request: Request) {
 }
 
 async function publishPost(supabase: any, postId: string, immediate: boolean) {
-  const { data: post } = await supabase
+  if (!postId) {
+    return NextResponse.json({ error: "Missing postId" }, { status: 400 });
+  }
+
+  const { data: post, error: postError } = await supabase
     .from("posts")
     .select("*, brands(*)")
     .eq("id", postId)
     .single();
 
+  if (postError) {
+    console.error("[publish-post] Post query error:", postError);
+    return NextResponse.json({ error: `Post query failed: ${postError.message}` }, { status: 500 });
+  }
+
   if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
 
+  if (!post.image_url) {
+    return NextResponse.json({ error: "Post has no image. Generate or upload an image first." }, { status: 400 });
+  }
+
   const brand = post.brands;
+  if (!brand) {
+    console.error("[publish-post] Brand join returned null for post:", postId);
+    return NextResponse.json({ error: "Brand not found — unable to determine social accounts" }, { status: 500 });
+  }
 
   // Get Postforme account IDs
   let igAccountId = process.env.POSTFORME_IG_ACCOUNT_ID ?? null;
@@ -51,23 +68,22 @@ async function publishPost(supabase: any, postId: string, immediate: boolean) {
 
   const socialAccounts = [igAccountId, fbAccountId].filter(Boolean) as string[];
   if (socialAccounts.length === 0) {
-    return NextResponse.json({ error: "No social accounts configured" }, { status: 400 });
+    return NextResponse.json({ error: "No social accounts configured. Add Instagram or Facebook in Settings." }, { status: 400 });
   }
 
   const pfmApiKey = process.env.POSTFORME_API_KEY;
   if (!pfmApiKey) {
-    return NextResponse.json({ error: "POSTFORME_API_KEY not configured" }, { status: 500 });
+    return NextResponse.json({ error: "POSTFORME_API_KEY not configured on server" }, { status: 500 });
   }
 
   // Build Postforme API request body
   const body: any = {
     caption: post.caption || "",
     social_accounts: socialAccounts,
-    media: post.image_url ? [{ url: post.image_url }] : [],
+    media: [{ url: post.image_url }],
   };
 
-  // If scheduled_at is in the future, include it
-  // Only include scheduled_at for non-immediate publishes
+  // If scheduled_at is in the future, include it (only for non-immediate publishes)
   if (!immediate && post.scheduled_at) {
     const scheduledDate = new Date(post.scheduled_at);
     if (scheduledDate > new Date()) {
@@ -76,7 +92,7 @@ async function publishPost(supabase: any, postId: string, immediate: boolean) {
   }
 
   try {
-    console.log("[publish-post] Sending to Postforme:", JSON.stringify(body));
+    console.log("[publish-post] Sending to Postforme:", JSON.stringify({ ...body, media: [`${post.image_url.slice(0, 80)}...`] }));
 
     const res = await fetch("https://api.postforme.dev/v1/social-posts", {
       method: "POST",
@@ -87,14 +103,20 @@ async function publishPost(supabase: any, postId: string, immediate: boolean) {
       body: JSON.stringify(body),
     });
 
-    const responseData = await res.json();
-    console.log("[publish-post] Postforme response:", res.status, JSON.stringify(responseData));
+    const responseText = await res.text();
+    let responseData: any;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      console.error("[publish-post] Non-JSON response from Postforme:", res.status, responseText.slice(0, 500));
+      return NextResponse.json({ error: `Postforme returned invalid response (${res.status})` }, { status: 502 });
+    }
+
+    console.log("[publish-post] Postforme response:", res.status, JSON.stringify(responseData).slice(0, 300));
 
     if (!res.ok) {
-      return NextResponse.json(
-        { error: `Postforme error: ${responseData.message || responseData.error || res.status}` },
-        { status: 502 }
-      );
+      const msg = responseData.message || responseData.error || `HTTP ${res.status}`;
+      return NextResponse.json({ error: `Postforme: ${msg}` }, { status: 502 });
     }
 
     const { error: updateError } = await supabase
@@ -107,12 +129,12 @@ async function publishPost(supabase: any, postId: string, immediate: boolean) {
 
     if (updateError) {
       console.error("[publish-post] DB update error:", updateError);
+      return NextResponse.json({ error: `Published but failed to update status: ${updateError.message}` }, { status: 500 });
     }
 
-    console.log("[publish-post] Success. Postforme status:", responseData.status);
     return NextResponse.json({ ok: true, response: responseData });
   } catch (e: any) {
-    console.error("[publish-post] Error:", e.message);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error("[publish-post] Network error:", e.message);
+    return NextResponse.json({ error: `Network error: ${e.message}` }, { status: 500 });
   }
 }
