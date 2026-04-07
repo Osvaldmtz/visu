@@ -83,7 +83,7 @@ async function generateGeminiBackground(bgPrompt: string, primaryColor: string, 
   const apiKey = process.env.GOOGLE_AI_API_KEY;
   if (!apiKey) return null;
 
-  const formatDesc = aspectRatio === "portrait" ? "portrait 4:5 vertical format" : "square format";
+  const formatDesc = aspectRatio === "story" ? "vertical 9:16 story format" : aspectRatio === "portrait" ? "portrait 4:5 vertical format" : "square format";
   const prompt = `Generate a background image: ${bgPrompt}, ${primaryColor} purple tones, no text, no people, no objects, professional, clean background, high quality, ${formatDesc}`;
 
   try {
