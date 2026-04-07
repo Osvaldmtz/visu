@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { toPng } from "html-to-image";
 import { useRouter } from "next/navigation";
-import { renderTemplate } from "./templates";
+import { renderTemplate, type OverlayFilter } from "./templates";
 import { toDataUrl } from "@/lib/image-utils";
 
 interface Brand {
@@ -15,6 +15,7 @@ interface Brand {
   primary_color: string;
   active_layouts: number[];
   posts_per_week?: number;
+  default_overlay_filter?: string;
 }
 
 interface PendingPost {
@@ -88,6 +89,7 @@ export default function AutoGenerate({
         if (pendingRender.subtitle) formData.append("subtitle", pendingRender.subtitle);
         if (pendingRender.backgroundUrl) formData.append("background_url", pendingRender.backgroundUrl);
         if (pendingRender.scheduledAt) formData.append("scheduled_at", pendingRender.scheduledAt);
+        formData.append("overlay_filter", brand.default_overlay_filter || "purple");
 
         const uploadRes = await fetch("/api/approve-post", { method: "POST", body: formData });
         if (!uploadRes.ok) throw new Error("Upload failed");
@@ -270,6 +272,7 @@ export default function AutoGenerate({
               logoUrl: pendingRender.logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
               backgroundUrl: pendingRender.bgDataUrl || undefined,
+              overlayFilter: (brand.default_overlay_filter as OverlayFilter) ?? "purple",
             })}
           </div>
         </div>

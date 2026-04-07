@@ -435,6 +435,7 @@ export default function PostReviewPage() {
     primaryColor: brand.primary_color ?? "#7C3DE3",
     backgroundUrl: bgDataUrl || undefined,
     overlayFilter: (post.overlay_filter ?? "purple") as "none" | "purple" | "dark" | "gradient",
+    cardOpacity: post.card_opacity ?? 0.9,
     draggable: true,
     scale,
     positions,

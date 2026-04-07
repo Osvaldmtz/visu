@@ -84,6 +84,7 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
               primaryColor: brand.primary_color ?? "#7C3DE3",
               backgroundUrl: post.background_url || undefined,
               overlayFilter: (post.overlay_filter ?? "purple") as OverlayFilter,
+              cardOpacity: post.card_opacity ?? 0.9,
               positions: post.positions ?? undefined,
             })}
           </div>

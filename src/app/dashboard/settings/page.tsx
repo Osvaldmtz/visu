@@ -61,6 +61,7 @@ export default function SettingsPage() {
   const [brandSkill, setBrandSkill] = useState("");
   const [brandSkillUpdatedAt, setBrandSkillUpdatedAt] = useState<string | null>(null);
   const [savingSkill, setSavingSkill] = useState(false);
+  const [defaultOverlayFilter, setDefaultOverlayFilter] = useState("purple");
 
   useEffect(() => {
     const load = async () => {
@@ -104,6 +105,7 @@ export default function SettingsPage() {
       setTopicsToAvoid(data.topics_to_avoid || "");
       setBrandSkill(data.brand_skill || "");
       setBrandSkillUpdatedAt(data.brand_skill_updated_at || null);
+      setDefaultOverlayFilter(data.default_overlay_filter || "purple");
     };
     load();
   }, [router]);
@@ -152,6 +154,7 @@ export default function SettingsPage() {
         brand_voice: brandVoice || null,
         content_topics: contentTopics || null,
         topics_to_avoid: topicsToAvoid || null,
+        default_overlay_filter: defaultOverlayFilter,
       })
       .eq("id", brand.id);
     setSaving(false);
@@ -317,6 +320,31 @@ export default function SettingsPage() {
                 ))}
               </select>
             </Field>
+            <div>
+              <span className="text-xs text-neutral-500 mb-2 block">Overlay por defecto</span>
+              <div className="flex gap-1.5">
+                {([
+                  ["none", "Sin filtro", "bg-neutral-700"],
+                  ["purple", "Morado", "bg-purple-600"],
+                  ["dark", "Oscuro", "bg-neutral-900"],
+                  ["gradient", "Degradado", "bg-gradient-to-b from-transparent to-black"],
+                ] as const).map(([value, label, colorClass]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setDefaultOverlayFilter(value)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-colors ${
+                      defaultOverlayFilter === value
+                        ? "border-accent bg-accent/10 text-accent border"
+                        : "border border-surface-border bg-surface-light text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    <span className={`w-3 h-3 rounded-sm ${colorClass}`} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </Section>
 
           {/* Content & Voice */}

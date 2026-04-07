@@ -7,6 +7,7 @@ interface PhotoProps {
   logoUrl: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
+  cardOpacity?: number;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
@@ -18,6 +19,7 @@ export default function PhotoTemplate({
   logoUrl,
   backgroundUrl,
   overlayFilter = "none",
+  cardOpacity = 0.9,
   draggable,
   scale,
   positions,
@@ -86,7 +88,7 @@ export default function PhotoTemplate({
       >
         <div
           style={{
-            backgroundColor: "rgba(255, 255, 255, 0.92)",
+            backgroundColor: `rgba(255, 255, 255, ${cardOpacity})`,
             borderRadius: 24,
             padding: "48px 56px",
             display: "flex",

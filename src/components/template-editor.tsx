@@ -15,6 +15,7 @@ interface Brand {
   secondary_color: string | null;
   font_family: string;
   active_layouts: number[];
+  default_overlay_filter?: string;
 }
 
 interface TemplateEditorProps {
@@ -59,7 +60,8 @@ export default function TemplateEditor({
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = useState("");
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const [overlayFilter, setOverlayFilter] = useState<OverlayFilter>("purple");
+  const [overlayFilter, setOverlayFilter] = useState<OverlayFilter>((brand.default_overlay_filter as OverlayFilter) ?? "purple");
+  const [cardOpacity, setCardOpacity] = useState(0.9);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pick the right logo variant based on layout
@@ -88,6 +90,7 @@ export default function TemplateEditor({
     primaryColor,
     backgroundUrl: backgroundUrl || undefined,
     overlayFilter,
+    cardOpacity,
     draggable: true,
     scale,
     positions,
@@ -181,6 +184,7 @@ export default function TemplateEditor({
     if (scheduledAt) formData.append("scheduled_at", scheduledAt);
     if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
     formData.append("overlay_filter", overlayFilter);
+    formData.append("card_opacity", String(cardOpacity));
 
     const res = await fetch("/api/approve-post", {
       method: "POST",
@@ -459,6 +463,21 @@ export default function TemplateEditor({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Card opacity slider */}
+            <div className="mt-3">
+              <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                Opacidad del card — {Math.round(cardOpacity * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={Math.round(cardOpacity * 100)}
+                onChange={(e) => setCardOpacity(Number(e.target.value) / 100)}
+                className="w-full accent-accent"
+              />
             </div>
           </div>
         )}

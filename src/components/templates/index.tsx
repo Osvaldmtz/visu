@@ -13,6 +13,7 @@ export interface TemplateProps {
   primaryColor: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
+  cardOpacity?: number;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
@@ -23,7 +24,7 @@ export const TEMPLATE_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
 
 export function renderTemplate(layout: number, props: TemplateProps) {
   const { onDragStop, positions, ...rest } = props;
-  const common = { draggable: rest.draggable, scale: rest.scale, positions, onDragStop, overlayFilter: rest.overlayFilter };
+  const common = { draggable: rest.draggable, scale: rest.scale, positions, onDragStop, overlayFilter: rest.overlayFilter, cardOpacity: rest.cardOpacity };
   switch (layout) {
     case 0:
       return (

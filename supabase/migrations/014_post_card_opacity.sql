@@ -1,0 +1,1 @@
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS card_opacity real NOT NULL DEFAULT 0.9;
