@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { renderTemplate } from "./templates";
 import type { OverlayFilter } from "./templates";
+import { toDataUrl } from "@/lib/image-utils";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-yellow-500/20 text-yellow-400",
@@ -55,11 +56,21 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
     return () => ro.disconnect();
   }, [canRenderLive]);
 
-  const logoUrl = canRenderLive
+  const [logoDataUrl, setLogoDataUrl] = useState("");
+
+  const rawLogoUrl = canRenderLive
     ? (post.layout <= 1
         ? brand.logo_light_url || brand.logo_url || ""
         : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "")
     : "";
+
+  useEffect(() => {
+    if (rawLogoUrl) {
+      toDataUrl(rawLogoUrl).then(setLogoDataUrl);
+    } else {
+      setLogoDataUrl("");
+    }
+  }, [rawLogoUrl]);
 
   return (
     <div className="bg-surface-light border border-surface-border rounded-xl overflow-hidden hover:border-accent/50 transition-colors group relative">
@@ -80,7 +91,7 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
             {renderTemplate(post.layout, {
               title: post.title,
               subtitle: post.subtitle ?? "",
-              logoUrl,
+              logoUrl: logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
               backgroundUrl: post.background_url || undefined,
               overlayFilter: (post.overlay_filter ?? "purple") as OverlayFilter,
