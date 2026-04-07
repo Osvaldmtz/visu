@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { toPng } from "html-to-image";
-import { renderTemplate, TEMPLATE_NAMES } from "./templates";
+import { renderTemplate, TEMPLATE_NAMES, type OverlayFilter } from "./templates";
 import { toDataUrl } from "@/lib/image-utils";
 
 interface Brand {
@@ -59,6 +59,7 @@ export default function TemplateEditor({
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = useState("");
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [overlayFilter, setOverlayFilter] = useState<OverlayFilter>("purple");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pick the right logo variant based on layout
@@ -86,6 +87,7 @@ export default function TemplateEditor({
     logoUrl: logoDataUrl || logoUrl,
     primaryColor,
     backgroundUrl: backgroundUrl || undefined,
+    overlayFilter,
     draggable: true,
     scale,
     positions,
@@ -178,6 +180,7 @@ export default function TemplateEditor({
     if (currentPostId) formData.append("postId", currentPostId);
     if (scheduledAt) formData.append("scheduled_at", scheduledAt);
     if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
+    formData.append("overlay_filter", overlayFilter);
 
     const res = await fetch("/api/approve-post", {
       method: "POST",
@@ -429,6 +432,34 @@ export default function TemplateEditor({
                 Quitar imagen
               </button>
             )}
+
+            {/* Overlay filter pills */}
+            <div className="mt-3">
+              <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                Filtro overlay
+              </label>
+              <div className="flex gap-1.5">
+                {([
+                  ["none", "Sin filtro", "bg-neutral-700"],
+                  ["purple", "Morado", "bg-purple-600"],
+                  ["dark", "Oscuro", "bg-neutral-900"],
+                  ["gradient", "Degradado", "bg-gradient-to-b from-transparent to-black"],
+                ] as const).map(([value, label, colorClass]) => (
+                  <button
+                    key={value}
+                    onClick={() => setOverlayFilter(value as OverlayFilter)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                      overlayFilter === value
+                        ? "border-accent bg-accent/10 text-accent border"
+                        : "border border-surface-border bg-surface-light text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    <span className={`w-3 h-3 rounded-sm ${colorClass}`} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

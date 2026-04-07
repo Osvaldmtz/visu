@@ -17,6 +17,7 @@ export async function POST(request: Request) {
   const scheduledAt = formData.get("scheduled_at") as string | null;
   const statusOverride = formData.get("status") as string | null;
   const positionsField = formData.get("positions") as string | null;
+  const overlayFilter = formData.get("overlay_filter") as string | null;
 
   if (!file || !brandId) {
     return NextResponse.json({ error: "Missing file or brandId" }, { status: 400 });
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
     subtitle: subtitle || null,
     background_url: backgroundUrlField || null,
     positions: positionsField ? JSON.parse(positionsField) : null,
+    overlay_filter: overlayFilter || "purple",
   };
 
   if (scheduledAt) {

@@ -1,5 +1,6 @@
 import React from "react";
 import DraggableElement from "./draggable-element";
+import type { OverlayFilter } from "./index";
 
 interface SplitProps {
   title: string;
@@ -7,6 +8,7 @@ interface SplitProps {
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
+  overlayFilter?: OverlayFilter;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
@@ -19,6 +21,7 @@ export default function SplitTemplate({
   logoUrl,
   primaryColor,
   backgroundUrl,
+  overlayFilter = "none",
   draggable,
   scale,
   positions,
@@ -146,6 +149,18 @@ export default function SplitTemplate({
               width: "100%",
               height: "100%",
               background: `linear-gradient(180deg, #1a1a2e 0%, #0d0d1a 100%)`,
+            }}
+          />
+        )}
+        {/* Overlay filter */}
+        {overlayFilter !== "none" && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              ...(overlayFilter === "purple" ? { backgroundColor: primaryColor, opacity: 0.45 } :
+                overlayFilter === "dark" ? { backgroundColor: "#000000", opacity: 0.45 } :
+                { background: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%)" }),
             }}
           />
         )}

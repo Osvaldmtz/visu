@@ -434,6 +434,7 @@ export default function PostReviewPage() {
     logoUrl: logoDataUrl || "",
     primaryColor: brand.primary_color ?? "#7C3DE3",
     backgroundUrl: bgDataUrl || undefined,
+    overlayFilter: (post.overlay_filter ?? "purple") as "none" | "purple" | "dark" | "gradient",
     draggable: true,
     scale,
     positions,

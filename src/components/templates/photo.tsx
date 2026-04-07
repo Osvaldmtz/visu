@@ -1,10 +1,12 @@
 import React from "react";
 import DraggableElement from "./draggable-element";
+import type { OverlayFilter } from "./index";
 
 interface PhotoProps {
   title: string;
   logoUrl: string;
   backgroundUrl?: string;
+  overlayFilter?: OverlayFilter;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
@@ -15,6 +17,7 @@ export default function PhotoTemplate({
   title,
   logoUrl,
   backgroundUrl,
+  overlayFilter = "none",
   draggable,
   scale,
   positions,
@@ -50,6 +53,19 @@ export default function PhotoTemplate({
             position: "absolute",
             inset: 0,
             background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          }}
+        />
+      )}
+
+      {/* Overlay filter */}
+      {overlayFilter !== "none" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            ...(overlayFilter === "purple" ? { backgroundColor: "#7C3DE3", opacity: 0.45 } :
+              overlayFilter === "dark" ? { backgroundColor: "#000000", opacity: 0.45 } :
+              { background: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%)" }),
           }}
         />
       )}
