@@ -78,6 +78,8 @@ export async function POST(request: Request) {
     postData.scheduled_at = scheduledAt;
   }
 
+  let savedPostId = postId;
+
   if (postId) {
     const { error } = await supabase.from("posts").update(postData).eq("id", postId);
     if (error) {
@@ -85,12 +87,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Update failed" }, { status: 500 });
     }
   } else {
-    const { error } = await supabase.from("posts").insert(postData);
+    const { data: inserted, error } = await supabase.from("posts").insert(postData).select("id").single();
     if (error) {
       console.error("Insert error:", error);
       return NextResponse.json({ error: "Insert failed" }, { status: 500 });
     }
+    savedPostId = inserted.id;
   }
 
-  return NextResponse.json({ ok: true, imageUrl: publicUrl });
+  return NextResponse.json({ ok: true, imageUrl: publicUrl, postId: savedPostId });
 }

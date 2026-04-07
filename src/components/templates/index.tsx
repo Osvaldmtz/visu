@@ -4,12 +4,15 @@ import SplitTemplate from "./split";
 import MinimalTemplate from "./minimal";
 import PhotoTemplate from "./photo";
 
+export type OverlayFilter = "none" | "purple" | "dark" | "gradient";
+
 export interface TemplateProps {
   title: string;
   subtitle?: string;
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
+  overlayFilter?: OverlayFilter;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
@@ -20,7 +23,7 @@ export const TEMPLATE_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
 
 export function renderTemplate(layout: number, props: TemplateProps) {
   const { onDragStop, positions, ...rest } = props;
-  const common = { draggable: rest.draggable, scale: rest.scale, positions, onDragStop };
+  const common = { draggable: rest.draggable, scale: rest.scale, positions, onDragStop, overlayFilter: rest.overlayFilter };
   switch (layout) {
     case 0:
       return (

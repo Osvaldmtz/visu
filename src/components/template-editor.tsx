@@ -50,6 +50,8 @@ export default function TemplateEditor({
   const [backgroundUrl, setBackgroundUrl] = useState(initialBackgroundUrl ?? "");
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [currentPostId, setCurrentPostId] = useState(postId ?? null);
   const [generating, setGenerating] = useState(false);
   const [photoQuery, setPhotoQuery] = useState("");
   const [photoResults, setPhotoResults] = useState<any[]>([]);
@@ -160,31 +162,48 @@ export default function TemplateEditor({
     URL.revokeObjectURL(url);
   };
 
+  const savePost = async (status: string): Promise<boolean> => {
+    const blob = await exportToPng();
+    if (!blob) return false;
+
+    const formData = new FormData();
+    formData.append("file", blob, `post-${Date.now()}.png`);
+    formData.append("brandId", brand.id);
+    formData.append("layout", String(layout));
+    formData.append("title", title);
+    formData.append("caption", caption);
+    formData.append("status", status);
+    if (subtitle) formData.append("subtitle", subtitle);
+    if (backgroundUrl) formData.append("background_url", backgroundUrl);
+    if (currentPostId) formData.append("postId", currentPostId);
+    if (scheduledAt) formData.append("scheduled_at", scheduledAt);
+    if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
+
+    const res = await fetch("/api/approve-post", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error("Failed to save post");
+    const data = await res.json();
+    if (data.postId) setCurrentPostId(data.postId);
+    return true;
+  };
+
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    try {
+      await savePost("DRAFT");
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handleApprove = async () => {
     setSaving(true);
     try {
-      const blob = await exportToPng();
-      if (!blob) return;
-
-      const formData = new FormData();
-      formData.append("file", blob, `post-${Date.now()}.png`);
-      formData.append("brandId", brand.id);
-      formData.append("layout", String(layout));
-      formData.append("title", title);
-      formData.append("caption", caption);
-      if (subtitle) formData.append("subtitle", subtitle);
-      if (backgroundUrl) formData.append("background_url", backgroundUrl);
-      if (postId) formData.append("postId", postId);
-      if (scheduledAt) formData.append("scheduled_at", scheduledAt);
-      if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
-
-      const res = await fetch("/api/approve-post", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("Failed to save post");
-      onSaved?.();
+      const ok = await savePost("APPROVED");
+      if (ok) onSaved?.();
     } finally {
       setSaving(false);
     }
@@ -416,15 +435,15 @@ export default function TemplateEditor({
         {/* Action buttons */}
         <div className="flex gap-3 pt-2">
           <button
-            onClick={handleExport}
-            disabled={exporting}
+            onClick={handleSaveDraft}
+            disabled={savingDraft || saving || exporting}
             className="flex-1 bg-surface-light hover:bg-surface-border disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm border border-surface-border"
           >
-            {exporting ? "..." : "Exportar PNG"}
+            {savingDraft ? "Guardando..." : "Guardar borrador"}
           </button>
           <button
             onClick={handleApprove}
-            disabled={saving || exporting}
+            disabled={saving || savingDraft || exporting}
             className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm"
           >
             {saving ? "Guardando..." : "Aprobar post"}

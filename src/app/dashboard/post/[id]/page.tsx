@@ -26,6 +26,7 @@ export default function PostReviewPage() {
   const [resetKey, setResetKey] = useState(0);
   const [interactive, setInteractive] = useState(false);
   const [hasDragChanges, setHasDragChanges] = useState(false);
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [savingPosition, setSavingPosition] = useState(false);
   const [publishedMessage, setPublishedMessage] = useState("");
   const [publishError, setPublishError] = useState("");
@@ -88,6 +89,11 @@ export default function PostReviewPage() {
               }
             })
             .catch(() => {});
+        }
+
+        // Load saved positions
+        if (postData.positions) {
+          setPositions(postData.positions);
         }
 
         // If post has template data, enable interactive mode
@@ -276,6 +282,7 @@ export default function PostReviewPage() {
       formData.append("status", post.status);
       if (post.subtitle) formData.append("subtitle", post.subtitle);
       if (post.background_url) formData.append("background_url", post.background_url);
+      if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
 
       const uploadRes = await fetch("/api/approve-post", {
         method: "POST",
@@ -285,14 +292,14 @@ export default function PostReviewPage() {
       if (!uploadRes.ok) throw new Error("Save failed");
 
       const result = await uploadRes.json();
-      setPost({ ...post, image_url: result.imageUrl });
+      setPost({ ...post, image_url: result.imageUrl, positions });
       setHasDragChanges(false);
     } catch (e: any) {
       console.error("Save position error:", e);
     } finally {
       setSavingPosition(false);
     }
-  }, [brand, post, caption]);
+  }, [brand, post, caption, positions]);
 
   // Approve with re-export: capture current interactive template as PNG
   const handleApproveWithExport = useCallback(async () => {
@@ -325,6 +332,7 @@ export default function PostReviewPage() {
       formData.append("status", "APPROVED");
       if (post.subtitle) formData.append("subtitle", post.subtitle);
       if (post.background_url) formData.append("background_url", post.background_url);
+      if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
       if (scheduleDate) {
         formData.append("scheduled_at", `${scheduleDate}T${scheduleTime}:00Z`);
       }
@@ -342,7 +350,7 @@ export default function PostReviewPage() {
       console.error("Approve export error:", e);
       setLoading("");
     }
-  }, [brand, post, caption, scheduleDate, scheduleTime, router]);
+  }, [brand, post, caption, positions, scheduleDate, scheduleTime, router]);
 
   // Regeneration capture & upload
   useEffect(() => {
@@ -415,6 +423,11 @@ export default function PostReviewPage() {
   const isScheduled = post.status === "SCHEDULED";
   const isPublished = post.status === "PUBLISHED";
 
+  const handleDragStop = (elementId: string, pos: { x: number; y: number }) => {
+    setPositions((prev) => ({ ...prev, [elementId]: pos }));
+    setHasDragChanges(true);
+  };
+
   const templateProps = {
     title: post.title,
     subtitle: post.subtitle ?? "",
@@ -423,7 +436,8 @@ export default function PostReviewPage() {
     backgroundUrl: bgDataUrl || undefined,
     draggable: true,
     scale,
-    onDragChange: () => setHasDragChanges(true),
+    positions,
+    onDragStop: handleDragStop,
   };
 
   return (

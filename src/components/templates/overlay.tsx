@@ -1,18 +1,20 @@
 import React from "react";
 import DraggableElement from "./draggable-element";
+import type { OverlayFilter } from "./index";
 
 interface OverlayProps {
   title: string;
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
+  overlayFilter?: OverlayFilter;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
   onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
-export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, draggable, scale, positions, onDragStop }: OverlayProps) {
+export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, overlayFilter = "purple", draggable, scale, positions, onDragStop }: OverlayProps) {
   return (
     <div
       style={{
@@ -60,15 +62,18 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
         }}
       />
 
-      {/* Primary color overlay at 45% */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: primaryColor,
-          opacity: 0.45,
-        }}
-      />
+      {/* Overlay filter */}
+      {overlayFilter !== "none" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            ...(overlayFilter === "purple" ? { backgroundColor: primaryColor, opacity: 0.45 } :
+              overlayFilter === "dark" ? { backgroundColor: "#000000", opacity: 0.45 } :
+              { background: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%)" }),
+          }}
+        />
+      )}
 
       {/* Logo top left */}
       {logoUrl && (
