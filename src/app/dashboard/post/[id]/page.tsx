@@ -565,12 +565,15 @@ export default function PostReviewPage() {
 
           <div className="flex flex-col">
             {!isPublished ? (
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => { setTitle(e.target.value); setHasDragChanges(true); }}
-                className="text-xl font-bold mb-1 bg-transparent border-b border-transparent hover:border-surface-border focus:border-accent focus:outline-none transition-colors text-white w-full"
-              />
+              <div className="mb-2">
+                <label className="text-sm text-neutral-400 mb-1 block">Titulo</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => { setTitle(e.target.value); setHasDragChanges(true); }}
+                  className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-accent"
+                />
+              </div>
             ) : (
               <h2 className="text-xl font-bold mb-1">{title}</h2>
             )}
