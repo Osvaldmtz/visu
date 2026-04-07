@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toPng } from "html-to-image";
-import { renderTemplate } from "@/components/templates";
+import { renderTemplate, type OverlayFilter } from "@/components/templates";
 import { toDataUrl } from "@/lib/image-utils";
 
 export default function PostReviewPage() {
@@ -35,6 +35,8 @@ export default function PostReviewPage() {
   const [aiSuggestion, setAiSuggestion] = useState<{ days?: number[]; time?: string; reason?: string } | null>(null);
   const [showManualDate, setShowManualDate] = useState(false);
   const [suggestedLabel, setSuggestedLabel] = useState("");
+  const [overlayFilter, setOverlayFilter] = useState<OverlayFilter>("purple");
+  const [cardOpacity, setCardOpacity] = useState(0.9);
 
   useEffect(() => {
     const load = async () => {
@@ -95,6 +97,8 @@ export default function PostReviewPage() {
         if (postData.positions) {
           setPositions(postData.positions);
         }
+        setOverlayFilter((postData.overlay_filter ?? "purple") as OverlayFilter);
+        setCardOpacity(postData.card_opacity ?? 0.9);
 
         // If post has template data, enable interactive mode
         if (brandData && postData.title) {
@@ -283,6 +287,8 @@ export default function PostReviewPage() {
       if (post.subtitle) formData.append("subtitle", post.subtitle);
       if (post.background_url) formData.append("background_url", post.background_url);
       if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
+      formData.append("overlay_filter", overlayFilter);
+      formData.append("card_opacity", String(cardOpacity));
 
       const uploadRes = await fetch("/api/approve-post", {
         method: "POST",
@@ -292,14 +298,14 @@ export default function PostReviewPage() {
       if (!uploadRes.ok) throw new Error("Save failed");
 
       const result = await uploadRes.json();
-      setPost({ ...post, image_url: result.imageUrl, positions });
+      setPost({ ...post, image_url: result.imageUrl, positions, overlay_filter: overlayFilter, card_opacity: cardOpacity });
       setHasDragChanges(false);
     } catch (e: any) {
       console.error("Save position error:", e);
     } finally {
       setSavingPosition(false);
     }
-  }, [brand, post, caption, positions]);
+  }, [brand, post, caption, positions, overlayFilter, cardOpacity]);
 
   // Approve with re-export: capture current interactive template as PNG
   const handleApproveWithExport = useCallback(async () => {
@@ -333,6 +339,8 @@ export default function PostReviewPage() {
       if (post.subtitle) formData.append("subtitle", post.subtitle);
       if (post.background_url) formData.append("background_url", post.background_url);
       if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
+      formData.append("overlay_filter", overlayFilter);
+      formData.append("card_opacity", String(cardOpacity));
       if (scheduleDate) {
         formData.append("scheduled_at", `${scheduleDate}T${scheduleTime}:00Z`);
       }
@@ -350,7 +358,7 @@ export default function PostReviewPage() {
       console.error("Approve export error:", e);
       setLoading("");
     }
-  }, [brand, post, caption, positions, scheduleDate, scheduleTime, router]);
+  }, [brand, post, caption, positions, overlayFilter, cardOpacity, scheduleDate, scheduleTime, router]);
 
   // Regeneration capture & upload
   useEffect(() => {
@@ -434,8 +442,8 @@ export default function PostReviewPage() {
     logoUrl: logoDataUrl || "",
     primaryColor: brand.primary_color ?? "#7C3DE3",
     backgroundUrl: bgDataUrl || undefined,
-    overlayFilter: (post.overlay_filter ?? "purple") as "none" | "purple" | "dark" | "gradient",
-    cardOpacity: post.card_opacity ?? 0.9,
+    overlayFilter,
+    cardOpacity,
     draggable: true,
     scale,
     positions,
@@ -504,6 +512,51 @@ export default function PostReviewPage() {
                 <span className="text-xs text-neutral-500 flex items-center">
                   Arrastra los elementos para moverlos
                 </span>
+              </div>
+            )}
+
+            {/* Overlay filter & card opacity controls */}
+            {interactive && !isPublished && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                    Filtro overlay
+                  </label>
+                  <div className="flex gap-1.5">
+                    {([
+                      ["none", "Sin filtro", "bg-neutral-700"],
+                      ["purple", "Morado", "bg-purple-600"],
+                      ["dark", "Oscuro", "bg-neutral-900"],
+                      ["gradient", "Degradado", "bg-gradient-to-b from-transparent to-black"],
+                    ] as const).map(([value, label, colorClass]) => (
+                      <button
+                        key={value}
+                        onClick={() => { setOverlayFilter(value as OverlayFilter); setHasDragChanges(true); }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                          overlayFilter === value
+                            ? "border-accent bg-accent/10 text-accent border"
+                            : "border border-surface-border bg-surface-light text-neutral-400 hover:text-white"
+                        }`}
+                      >
+                        <span className={`w-3 h-3 rounded-sm ${colorClass}`} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                    Opacidad del card — {Math.round(cardOpacity * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round(cardOpacity * 100)}
+                    onChange={(e) => { setCardOpacity(Number(e.target.value) / 100); setHasDragChanges(true); }}
+                    className="w-full accent-accent"
+                  />
+                </div>
               </div>
             )}
           </div>
