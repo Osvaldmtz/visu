@@ -12,13 +12,15 @@ export interface TemplateProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
-  onDragChange?: () => void;
+  positions?: Record<string, { x: number; y: number }>;
+  onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
 export const TEMPLATE_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
 
 export function renderTemplate(layout: number, props: TemplateProps) {
-  const { onDragChange, ...rest } = props;
+  const { onDragStop, positions, ...rest } = props;
+  const common = { draggable: rest.draggable, scale: rest.scale, positions, onDragStop };
   switch (layout) {
     case 0:
       return (
@@ -27,9 +29,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           logoUrl={rest.logoUrl}
           primaryColor={rest.primaryColor}
           backgroundUrl={rest.backgroundUrl}
-          draggable={rest.draggable}
-          scale={rest.scale}
-          onDragChange={onDragChange}
+          {...common}
         />
       );
     case 1:
@@ -40,9 +40,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           logoUrl={rest.logoUrl}
           primaryColor={rest.primaryColor}
           backgroundUrl={rest.backgroundUrl}
-          draggable={rest.draggable}
-          scale={rest.scale}
-          onDragChange={onDragChange}
+          {...common}
         />
       );
     case 2:
@@ -52,9 +50,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           subtitle={rest.subtitle ?? ""}
           logoUrl={rest.logoUrl}
           primaryColor={rest.primaryColor}
-          draggable={rest.draggable}
-          scale={rest.scale}
-          onDragChange={onDragChange}
+          {...common}
         />
       );
     case 3:
@@ -63,9 +59,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
           title={rest.title}
           logoUrl={rest.logoUrl}
           backgroundUrl={rest.backgroundUrl}
-          draggable={rest.draggable}
-          scale={rest.scale}
-          onDragChange={onDragChange}
+          {...common}
         />
       );
     default:

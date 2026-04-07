@@ -9,7 +9,8 @@ interface SplitProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
-  onDragChange?: () => void;
+  positions?: Record<string, { x: number; y: number }>;
+  onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
 export default function SplitTemplate({
@@ -20,7 +21,8 @@ export default function SplitTemplate({
   backgroundUrl,
   draggable,
   scale,
-  onDragChange,
+  positions,
+  onDragStop,
 }: SplitProps) {
   return (
     <div
@@ -46,9 +48,11 @@ export default function SplitTemplate({
         {/* Logo top left */}
         {logoUrl && (
           <DraggableElement
+            elementId="logo"
             enabled={draggable}
             scale={scale}
-            onDragChange={onDragChange}
+            defaultPosition={positions?.logo}
+            onDragStop={onDragStop}
             style={{
               position: "absolute",
               top: 60,
@@ -66,9 +70,11 @@ export default function SplitTemplate({
 
         {/* Title bottom left */}
         <DraggableElement
+          elementId="title"
           enabled={draggable}
           scale={scale}
-          onDragChange={onDragChange}
+          defaultPosition={positions?.title}
+          onDragStop={onDragStop}
           style={{
             position: "absolute",
             bottom: 120,
@@ -93,9 +99,11 @@ export default function SplitTemplate({
         {/* Subtitle */}
         {subtitle && (
           <DraggableElement
+            elementId="subtitle"
             enabled={draggable}
             scale={scale}
-            onDragChange={onDragChange}
+            defaultPosition={positions?.subtitle}
+            onDragStop={onDragStop}
             style={{
               position: "absolute",
               bottom: 60,

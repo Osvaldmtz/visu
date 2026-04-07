@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   const postId = formData.get("postId") as string | null;
   const scheduledAt = formData.get("scheduled_at") as string | null;
   const statusOverride = formData.get("status") as string | null;
+  const positionsField = formData.get("positions") as string | null;
 
   if (!file || !brandId) {
     return NextResponse.json({ error: "Missing file or brandId" }, { status: 400 });
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
     status: statusOverride || "APPROVED",
     subtitle: subtitle || null,
     background_url: backgroundUrlField || null,
+    positions: positionsField ? JSON.parse(positionsField) : null,
   };
 
   if (scheduledAt) {

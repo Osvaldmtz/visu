@@ -5,18 +5,22 @@ import Draggable from "react-draggable";
 
 interface DraggableElementProps {
   children: React.ReactNode;
+  elementId?: string;
   enabled?: boolean;
   scale?: number;
   style?: React.CSSProperties;
-  onDragChange?: () => void;
+  defaultPosition?: { x: number; y: number };
+  onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
 export default function DraggableElement({
   children,
+  elementId = "",
   enabled = false,
   scale = 1,
   style,
-  onDragChange,
+  defaultPosition,
+  onDragStop,
 }: DraggableElementProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -31,10 +35,11 @@ export default function DraggableElement({
       nodeRef={nodeRef as any}
       bounds="parent"
       scale={scale}
+      defaultPosition={defaultPosition ?? { x: 0, y: 0 }}
       onStart={() => setDragging(true)}
-      onStop={() => {
+      onStop={(_e, data) => {
         setDragging(false);
-        onDragChange?.();
+        onDragStop?.(elementId, { x: data.x, y: data.y });
       }}
     >
       <div

@@ -8,7 +8,8 @@ interface MinimalProps {
   primaryColor: string;
   draggable?: boolean;
   scale?: number;
-  onDragChange?: () => void;
+  positions?: Record<string, { x: number; y: number }>;
+  onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
 export default function MinimalTemplate({
@@ -18,7 +19,8 @@ export default function MinimalTemplate({
   primaryColor,
   draggable,
   scale,
-  onDragChange,
+  positions,
+  onDragStop,
 }: MinimalProps) {
   return (
     <div
@@ -45,9 +47,11 @@ export default function MinimalTemplate({
 
       {/* Title */}
       <DraggableElement
+        elementId="title"
         enabled={draggable}
         scale={scale}
-        onDragChange={onDragChange}
+        defaultPosition={positions?.title}
+        onDragStop={onDragStop}
         style={{
           position: "absolute",
           top: 120,
@@ -97,9 +101,11 @@ export default function MinimalTemplate({
       {/* Logo bottom left */}
       {logoUrl && (
         <DraggableElement
+          elementId="logo"
           enabled={draggable}
           scale={scale}
-          onDragChange={onDragChange}
+          defaultPosition={positions?.logo}
+          onDragStop={onDragStop}
           style={{
             position: "absolute",
             bottom: 60,

@@ -8,10 +8,11 @@ interface OverlayProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
-  onDragChange?: () => void;
+  positions?: Record<string, { x: number; y: number }>;
+  onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
-export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, draggable, scale, onDragChange }: OverlayProps) {
+export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, draggable, scale, positions, onDragStop }: OverlayProps) {
   return (
     <div
       style={{
@@ -72,9 +73,11 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
       {/* Logo top left */}
       {logoUrl && (
         <DraggableElement
+          elementId="logo"
           enabled={draggable}
           scale={scale}
-          onDragChange={onDragChange}
+          defaultPosition={positions?.logo}
+          onDragStop={onDragStop}
           style={{
             position: "absolute",
             top: 60,
@@ -92,9 +95,11 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
 
       {/* Title at bottom */}
       <DraggableElement
+        elementId="title"
         enabled={draggable}
         scale={scale}
-        onDragChange={onDragChange}
+        defaultPosition={positions?.title}
+        onDragStop={onDragStop}
         style={{
           position: "absolute",
           bottom: 80,

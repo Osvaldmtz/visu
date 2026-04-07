@@ -56,6 +56,8 @@ export default function TemplateEditor({
   const [searchingPhotos, setSearchingPhotos] = useState(false);
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = useState("");
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pick the right logo variant based on layout
   const logoUrl =
@@ -72,12 +74,20 @@ export default function TemplateEditor({
     }
   }, [logoUrl]);
 
+  const handleDragStop = useCallback((elementId: string, pos: { x: number; y: number }) => {
+    setPositions((prev) => ({ ...prev, [elementId]: pos }));
+  }, []);
+
   const templateProps = {
     title: title || "Tu titulo aqui",
     subtitle,
     logoUrl: logoDataUrl || logoUrl,
     primaryColor,
     backgroundUrl: backgroundUrl || undefined,
+    draggable: true,
+    scale,
+    positions,
+    onDragStop: handleDragStop,
   };
 
   const handleGenerateAI = async () => {
@@ -96,6 +106,15 @@ export default function TemplateEditor({
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setBackgroundUrl(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   const handleSearchPhotos = async () => {
@@ -157,6 +176,7 @@ export default function TemplateEditor({
       if (backgroundUrl) formData.append("background_url", backgroundUrl);
       if (postId) formData.append("postId", postId);
       if (scheduledAt) formData.append("scheduled_at", scheduledAt);
+      if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
 
       const res = await fetch("/api/approve-post", {
         method: "POST",
@@ -181,7 +201,7 @@ export default function TemplateEditor({
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  const needsPhoto = layout === 1 || layout === 3;
+  const needsBackground = layout === 0 || layout === 1 || layout === 3;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6">
@@ -234,7 +254,7 @@ export default function TemplateEditor({
             {TEMPLATE_NAMES.map((name, i) => (
               <button
                 key={i}
-                onClick={() => setLayout(i)}
+                onClick={() => { setLayout(i); setPositions({}); }}
                 className={`text-xs py-2 px-1 rounded-lg border transition-colors ${
                   layout === i
                     ? "border-accent bg-accent/10 text-accent"
@@ -321,19 +341,36 @@ export default function TemplateEditor({
           </div>
         </div>
 
-        {/* Photo selector (layouts 1, 3) */}
-        {needsPhoto && (
+        {/* Background image (layouts 0, 1, 3) */}
+        {needsBackground && (
           <div>
             <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
-              Foto de fondo (Unsplash)
+              Imagen de fondo
             </label>
+
+            {/* Upload custom image */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full mb-2 px-3 py-2.5 bg-surface-light border border-surface-border rounded-lg text-sm text-neutral-400 hover:text-white hover:border-accent/50 transition-colors text-left"
+            >
+              Subir imagen propia...
+            </button>
+
+            {/* Unsplash search */}
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
                 value={photoQuery}
                 onChange={(e) => setPhotoQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearchPhotos()}
-                placeholder="Buscar fotos..."
+                placeholder="Buscar en Unsplash..."
                 className="flex-1 bg-surface-light border border-surface-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent"
               />
               <button
@@ -370,7 +407,7 @@ export default function TemplateEditor({
                 onClick={() => setBackgroundUrl("")}
                 className="text-xs text-red-400 hover:text-red-300 mt-2"
               >
-                Quitar foto
+                Quitar imagen
               </button>
             )}
           </div>

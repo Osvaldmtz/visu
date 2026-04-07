@@ -7,7 +7,8 @@ interface PhotoProps {
   backgroundUrl?: string;
   draggable?: boolean;
   scale?: number;
-  onDragChange?: () => void;
+  positions?: Record<string, { x: number; y: number }>;
+  onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
 export default function PhotoTemplate({
@@ -16,7 +17,8 @@ export default function PhotoTemplate({
   backgroundUrl,
   draggable,
   scale,
-  onDragChange,
+  positions,
+  onDragStop,
 }: PhotoProps) {
   return (
     <div
@@ -54,9 +56,11 @@ export default function PhotoTemplate({
 
       {/* White card at bottom */}
       <DraggableElement
+        elementId="card"
         enabled={draggable}
         scale={scale}
-        onDragChange={onDragChange}
+        defaultPosition={positions?.card}
+        onDragStop={onDragStop}
         style={{
           position: "absolute",
           bottom: 40,
