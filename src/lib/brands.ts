@@ -1,41 +1,9 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export async function getAccessibleBrands(supabase: SupabaseClient) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  // Query owned brands explicitly (does not depend on collaborator subquery in RLS)
-  const { data: owned } = await supabase
-    .from("brands")
-    .select("*")
-    .eq("user_id", user.id);
-
-  // Query brands assigned via collaborator role
-  const { data: collab } = await supabase
-    .from("collaborators")
-    .select("assigned_brands")
-    .eq("id", user.id)
-    .single();
-
-  const assignedIds: string[] = collab?.assigned_brands ?? [];
-
-  if (!assignedIds.length) return owned ?? [];
-
-  const { data: assignedBrands } = await supabase
-    .from("brands")
-    .select("*")
-    .in("id", assignedIds);
-
-  // Merge owned + assigned, deduplicate by id
-  const all = [...(owned ?? []), ...(assignedBrands ?? [])];
-  const seen = new Set<string>();
-  return all.filter((b) => {
-    if (seen.has(b.id)) return false;
-    seen.add(b.id);
-    return true;
-  });
+  // RLS handles access: returns owned brands + collaborator-assigned brands
+  const { data } = await supabase.from("brands").select("*");
+  return data ?? [];
 }
 
 export async function getActiveBrand(

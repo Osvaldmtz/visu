@@ -1,14 +1,14 @@
 // Test the full generation pipeline without Supabase tables
 // Generates 1 post image via Claude + FAL + Templated
 
-// Set these as env vars before running: ANTHROPIC_API_KEY, FAL_KEY, TEMPLATED_API_KEY
+// Set these as env vars before running: ANTHROPIC_API_KEY, GOOGLE_AI_API_KEY, TEMPLATED_API_KEY
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const FAL_KEY = process.env.FAL_KEY;
+const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
 const TEMPLATED_KEY = process.env.TEMPLATED_API_KEY;
 const TEMPLATE_ID = process.env.TEMPLATED_TEMPLATE_0 || '528e6dad-126a-4edc-9f5c-a0dc2390ddf7';
 const LOGO = 'https://raw.githubusercontent.com/Osvaldmtz/kalyo-landing/main/assets/logo-white.svg';
 
-if (!ANTHROPIC_KEY || !FAL_KEY || !TEMPLATED_KEY) {
+if (!ANTHROPIC_KEY || !GOOGLE_AI_API_KEY || !TEMPLATED_KEY) {
   console.error('Missing env vars. Run with: source .env.local && node scripts/test-pipeline.mjs');
   process.exit(1);
 }
@@ -44,26 +44,29 @@ const content = JSON.parse(raw);
 console.log(`  Title: ${content.title}`);
 console.log(`  Caption: ${content.caption.slice(0, 80)}...`);
 
-// Step 2: FAL background
-console.log('[2/3] FAL generating background...');
-const falRes = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
-  method: 'POST',
-  headers: { 'Authorization': `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    prompt: 'Pure deep purple gradient background, smooth bokeh light spots, no objects no people no text, minimal abstract',
-    image_size: 'square_hd', num_images: 1
-  })
-});
-const { response_url } = await falRes.json();
+// Step 2: Gemini background
+console.log('[2/3] Gemini generating background...');
+const geminiRes = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_AI_API_KEY}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: 'Generate a background image: Pure deep purple gradient background, smooth bokeh light spots, no objects no people no text, minimal abstract, square format' }] }],
+      generationConfig: { responseModalities: ['IMAGE', 'TEXT'], responseMimeType: 'text/plain' },
+    }),
+  }
+);
+const geminiData = await geminiRes.json();
+const imagePart = geminiData.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
 let bgUrl = null;
-for (let i = 0; i < 20; i++) {
-  await sleep(3000);
-  const poll = await fetch(response_url, { headers: { 'Authorization': `Key ${FAL_KEY}` } });
-  const data = await poll.json();
-  if (data.images) { bgUrl = data.images[0].url; break; }
-  process.stdout.write('.');
+if (imagePart) {
+  const { mimeType, data: b64 } = imagePart.inlineData;
+  bgUrl = `data:${mimeType};base64,${b64}`;
+  console.log(`  Background: [base64 data URL, ${Math.round(b64.length / 1024)}KB]`);
+} else {
+  console.log('  Background: null (no image returned)');
 }
-console.log(`\n  Background: ${bgUrl}`);
 
 // Step 3: Templated render
 console.log('[3/3] Templated rendering image...');

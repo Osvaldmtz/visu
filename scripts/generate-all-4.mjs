@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const FAL_KEY = process.env.FAL_KEY;
+const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
 const TEMPLATED_KEY = process.env.TEMPLATED_API_KEY;
 
 const supabase = createClient(SB_URL, SB_KEY);
@@ -26,11 +26,11 @@ const PROMPTS = [
   'Crea un post mostrando una funcion especifica de Kalyo: reportes con IA, mapa de riesgo, interpretacion DSM-5 o expediente digital.',
 ];
 
-const FAL_PROMPTS = [
-  'A psychological assessment form and brain scan visualization, purple and violet color palette, dark moody clinical atmosphere, bokeh background, professional medical aesthetic, no people, photorealistic',
-  'Hourglass with glowing purple light, digital calendar and clock elements, time concept visualization, deep purple gradient background, modern minimal, no people, photorealistic',
+const BG_PROMPTS = [
+  'Generate a background image: A psychological assessment form and brain scan visualization, purple and violet color palette, dark moody clinical atmosphere, bokeh background, professional medical aesthetic, no people, photorealistic, square format',
+  'Generate a background image: Hourglass with glowing purple light, digital calendar and clock elements, time concept visualization, deep purple gradient background, modern minimal, no people, photorealistic, square format',
   null,
-  'Futuristic medical dashboard interface with purple glowing screens, neural network visualization, clinical AI technology concept, dark background, no people, photorealistic',
+  'Generate a background image: Futuristic medical dashboard interface with purple glowing screens, neural network visualization, clinical AI technology concept, dark background, no people, photorealistic, square format',
 ];
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -52,20 +52,23 @@ async function generateContent(prompt, needsSubtitle) {
   return JSON.parse(raw);
 }
 
-async function generateFal(prompt) {
-  const res = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
-    method: 'POST',
-    headers: { 'Authorization': `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, image_size: 'square_hd', num_images: 1 })
-  });
-  const { response_url } = await res.json();
-  for (let i = 0; i < 20; i++) {
-    await sleep(3000);
-    const poll = await fetch(response_url, { headers: { 'Authorization': `Key ${FAL_KEY}` } });
-    const data = await poll.json();
-    if (data.images) return data.images[0].url;
-  }
-  return null;
+async function generateBackground(prompt) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_AI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'], responseMimeType: 'text/plain' },
+      }),
+    }
+  );
+  const data = await res.json();
+  const imagePart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+  if (!imagePart) return null;
+  const { mimeType, data: b64 } = imagePart.inlineData;
+  return `data:${mimeType};base64,${b64}`;
 }
 
 async function render(templateId, layers) {
@@ -91,9 +94,9 @@ for (let idx = 0; idx < 4; idx++) {
 
   // 2. Background
   let bgUrl = null;
-  if (FAL_PROMPTS[idx]) {
-    console.log('  Generating FAL background...');
-    bgUrl = await generateFal(FAL_PROMPTS[idx]);
+  if (BG_PROMPTS[idx]) {
+    console.log('  Generating Gemini background...');
+    bgUrl = await generateBackground(BG_PROMPTS[idx]);
   }
 
   // 3. Build layers per layout

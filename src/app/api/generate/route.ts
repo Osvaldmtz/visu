@@ -79,41 +79,46 @@ async function generateContent(
   return JSON.parse(raw);
 }
 
-async function generateFalBackground(bgPrompt: string, primaryColor: string): Promise<string | null> {
-  const falKey = process.env.FAL_KEY;
-  if (!falKey) return null;
+async function generateGeminiBackground(bgPrompt: string, primaryColor: string): Promise<string | null> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) return null;
 
-  const prompt = `${bgPrompt}, ${primaryColor} purple tones, no text, no people, no objects, professional, clean background, high quality`;
+  const prompt = `Generate a background image: ${bgPrompt}, ${primaryColor} purple tones, no text, no people, no objects, professional, clean background, high quality, square format`;
 
   try {
-    const res = await fetch("https://queue.fal.run/fal-ai/flux/schnell", {
-      method: "POST",
-      headers: {
-        Authorization: `Key ${falKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt, image_size: "square_hd", num_images: 1 }),
-    });
-    const body = await res.json();
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ["IMAGE", "TEXT"],
+            responseMimeType: "text/plain",
+          },
+        }),
+      }
+    );
+
     if (!res.ok) {
-      console.error("FAL queue error:", res.status, JSON.stringify(body));
+      const errBody = await res.text();
+      console.error("Gemini image error:", res.status, errBody);
       return null;
     }
-    const { response_url } = body;
 
-    // Poll for result
-    for (let i = 0; i < 20; i++) {
-      await new Promise((r) => setTimeout(r, i < 3 ? 1000 : 2000));
-      const poll = await fetch(response_url, {
-        headers: { Authorization: `Key ${falKey}` },
-      });
-      const data = await poll.json();
-      if (data.images) return data.images[0].url;
-    }
-    console.error("FAL polling timed out");
-    return null;
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts;
+    if (!parts) return null;
+
+    const imagePart = parts.find((p: any) => p.inlineData);
+    if (!imagePart) return null;
+
+    // Return as data URL — the template editor and approve-post flow accept this
+    const { mimeType, data: b64 } = imagePart.inlineData;
+    return `data:${mimeType};base64,${b64}`;
   } catch (e: any) {
-    console.error("FAL error:", e.message);
+    console.error("Gemini image error:", e.message);
     return null;
   }
 }
@@ -233,7 +238,7 @@ export async function POST(request: Request) {
     // Generate background image with FAL.ai for layouts 0, 1, 3
     let backgroundUrl: string | null = null;
     if (needsBackground && content.bg_prompt) {
-      backgroundUrl = await generateFalBackground(
+      backgroundUrl = await generateGeminiBackground(
         content.bg_prompt,
         brand.primary_color ?? "#7C3DE3"
       );

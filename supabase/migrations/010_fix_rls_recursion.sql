@@ -35,6 +35,9 @@ $$;
 -- ============================================
 drop policy if exists "Users can manage their brands" on brands;
 drop policy if exists "Users can access their brands" on brands;
+drop policy if exists "Users can manage own brands" on brands;
+drop policy if exists "Users can update own brands" on brands;
+drop policy if exists "Users can delete own brands" on brands;
 
 create policy "Users can access their brands"
   on brands for select

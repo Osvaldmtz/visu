@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 const SB_URL = 'https://ariroiycjuferrlxidla.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyaXJvaXljanVmZXJybHhpZGxhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzUxOTY4OCwiZXhwIjoyMDg5MDk1Njg4fQ.TnFQlDQECRvPgPfNdi55SkT1q0dplHPrR1HQgdSuhO8';
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const FAL_KEY = process.env.FAL_KEY;
+const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
 const TEMPLATED_KEY = process.env.TEMPLATED_API_KEY;
 
 const BRAND_ID = 'f48b8fc3-96ba-4fa4-8d74-bf70582bf52f';
@@ -46,25 +46,29 @@ const content = JSON.parse(raw);
 console.log(`  Title: ${content.title}`);
 console.log(`  Caption: ${content.caption}`);
 
-// Step 2: FAL background
-console.log('[2/4] FAL generating background...');
-const falRes = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
-  method: 'POST',
-  headers: { 'Authorization': `Key ${FAL_KEY}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    prompt: 'A psychological assessment form and brain scan visualization, purple and violet color palette, dark moody clinical atmosphere, bokeh background, professional medical aesthetic, no people, photorealistic',
-    image_size: 'square_hd', num_images: 1
-  })
-});
-const { response_url } = await falRes.json();
+// Step 2: Gemini background
+console.log('[2/4] Gemini generating background...');
+const geminiRes = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GOOGLE_AI_API_KEY}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: 'Generate a background image: A psychological assessment form and brain scan visualization, purple and violet color palette, dark moody clinical atmosphere, bokeh background, professional medical aesthetic, no people, photorealistic, square format' }] }],
+      generationConfig: { responseModalities: ['IMAGE', 'TEXT'], responseMimeType: 'text/plain' },
+    }),
+  }
+);
+const geminiData = await geminiRes.json();
+const imagePart = geminiData.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
 let bgUrl = null;
-for (let i = 0; i < 20; i++) {
-  await sleep(3000);
-  const poll = await fetch(response_url, { headers: { 'Authorization': `Key ${FAL_KEY}` } });
-  const data = await poll.json();
-  if (data.images) { bgUrl = data.images[0].url; break; }
+if (imagePart) {
+  const { mimeType, data: b64 } = imagePart.inlineData;
+  bgUrl = `data:${mimeType};base64,${b64}`;
+  console.log(`  Background: [base64 data URL, ${Math.round(b64.length / 1024)}KB]`);
+} else {
+  console.log('  Background: null (no image returned)');
 }
-console.log(`  Background: ${bgUrl}`);
 
 // Step 3: Templated render
 console.log('[3/4] Templated rendering image...');
