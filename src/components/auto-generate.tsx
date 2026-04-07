@@ -148,7 +148,7 @@ export default function AutoGenerate({
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brandId: brand.id, layout, excludeDates, skipBackground }),
+      body: JSON.stringify({ brandId: brand.id, layout, excludeDates, skipBackground, format: config.format }),
     });
     if (!res.ok) {
       const err = await res.json();

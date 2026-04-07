@@ -4,6 +4,7 @@ import type { OverlayFilter } from "./index";
 
 interface OverlayProps {
   title: string;
+  subtitle?: string;
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
@@ -15,7 +16,7 @@ interface OverlayProps {
   onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
-export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, overlayFilter = "purple", height = 1080, draggable, scale, positions, onDragStop }: OverlayProps) {
+export default function OverlayTemplate({ title, subtitle, logoUrl, primaryColor, backgroundUrl, overlayFilter = "purple", height = 1080, draggable, scale, positions, onDragStop }: OverlayProps) {
   return (
     <div
       style={{
@@ -126,6 +127,20 @@ export default function OverlayTemplate({ title, logoUrl, primaryColor, backgrou
         >
           {title}
         </h1>
+        {subtitle && (
+          <p
+            style={{
+              color: "rgba(255,255,255,0.8)",
+              fontSize: 28,
+              fontWeight: 400,
+              margin: 0,
+              marginTop: 16,
+              textShadow: "0 1px 10px rgba(0,0,0,0.3)",
+            }}
+          >
+            {subtitle}
+          </p>
+        )}
       </DraggableElement>
     </div>
   );

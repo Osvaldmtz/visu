@@ -31,6 +31,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
       return (
         <OverlayTemplate
           title={rest.title}
+          subtitle={rest.subtitle ?? ""}
           logoUrl={rest.logoUrl}
           primaryColor={rest.primaryColor}
           backgroundUrl={rest.backgroundUrl}
@@ -62,6 +63,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
       return (
         <PhotoTemplate
           title={rest.title}
+          subtitle={rest.subtitle ?? ""}
           logoUrl={rest.logoUrl}
           backgroundUrl={rest.backgroundUrl}
           {...common}

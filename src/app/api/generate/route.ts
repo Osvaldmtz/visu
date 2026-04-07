@@ -79,11 +79,12 @@ async function generateContent(
   return JSON.parse(raw);
 }
 
-async function generateGeminiBackground(bgPrompt: string, primaryColor: string): Promise<string | null> {
+async function generateGeminiBackground(bgPrompt: string, primaryColor: string, aspectRatio: string = "square"): Promise<string | null> {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
   if (!apiKey) return null;
 
-  const prompt = `Generate a background image: ${bgPrompt}, ${primaryColor} purple tones, no text, no people, no objects, professional, clean background, high quality, square format`;
+  const formatDesc = aspectRatio === "portrait" ? "portrait 4:5 vertical format" : "square format";
+  const prompt = `Generate a background image: ${bgPrompt}, ${primaryColor} purple tones, no text, no people, no objects, professional, clean background, high quality, ${formatDesc}`;
 
   try {
     const res = await fetch(
@@ -188,7 +189,7 @@ async function getNextScheduledDate(
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const { brandId, layout, excludeDates, customTopic, skipBackground } = await request.json();
+  const { brandId, layout, excludeDates, customTopic, skipBackground, format } = await request.json();
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -203,7 +204,7 @@ export async function POST(request: Request) {
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
 
   const idx = layout ?? 0;
-  const needsSubtitle = idx === 1 || idx === 2;
+  const needsSubtitle = true;
   const needsBackground = idx === 0 || idx === 1 || idx === 3;
 
   // Fetch last 20 used topics to avoid repetition
@@ -240,7 +241,8 @@ export async function POST(request: Request) {
     if (needsBackground && content.bg_prompt && !skipBackground) {
       backgroundUrl = await generateGeminiBackground(
         content.bg_prompt,
-        brand.primary_color ?? "#7C3DE3"
+        brand.primary_color ?? "#7C3DE3",
+        format ?? "square"
       );
     }
 

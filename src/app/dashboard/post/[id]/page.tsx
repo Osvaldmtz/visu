@@ -247,7 +247,7 @@ export default function PostReviewPage() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId: brand.id, layout: post.layout }),
+        body: JSON.stringify({ brandId: brand.id, layout: post.layout, format: postFormat }),
       });
       if (!res.ok) throw new Error("Generation failed");
       const data = await res.json();
@@ -416,6 +416,9 @@ export default function PostReviewPage() {
         if (regenData.scheduledAt) {
           formData.append("scheduled_at", regenData.scheduledAt);
         }
+        formData.append("overlay_filter", overlayFilter);
+        formData.append("card_opacity", String(cardOpacity));
+        formData.append("format", postFormat);
 
         const uploadRes = await fetch("/api/approve-post", {
           method: "POST",
@@ -783,6 +786,9 @@ export default function PostReviewPage() {
               logoUrl: regenData.logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
               backgroundUrl: regenData.bgDataUrl || undefined,
+              overlayFilter,
+              cardOpacity,
+              height: canvasHeight,
             })}
           </div>
         </div>

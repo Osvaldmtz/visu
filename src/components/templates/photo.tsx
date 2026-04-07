@@ -4,6 +4,7 @@ import type { OverlayFilter } from "./index";
 
 interface PhotoProps {
   title: string;
+  subtitle?: string;
   logoUrl: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
@@ -17,6 +18,7 @@ interface PhotoProps {
 
 export default function PhotoTemplate({
   title,
+  subtitle,
   logoUrl,
   backgroundUrl,
   overlayFilter = "none",
@@ -99,18 +101,32 @@ export default function PhotoTemplate({
             gap: 40,
           }}
         >
-          <h1
-            style={{
-              color: "#1A1A2E",
-              fontSize: 68,
-              fontWeight: 700,
-              lineHeight: 1.1,
-              margin: 0,
-              flex: 1,
-            }}
-          >
-            {title}
-          </h1>
+          <div style={{ flex: 1 }}>
+            <h1
+              style={{
+                color: "#1A1A2E",
+                fontSize: 68,
+                fontWeight: 700,
+                lineHeight: 1.1,
+                margin: 0,
+              }}
+            >
+              {title}
+            </h1>
+            {subtitle && (
+              <p
+                style={{
+                  color: "#6B7280",
+                  fontSize: 24,
+                  fontWeight: 400,
+                  margin: 0,
+                  marginTop: 12,
+                }}
+              >
+                {subtitle}
+              </p>
+            )}
+          </div>
 
           {logoUrl && (
             <img

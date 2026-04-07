@@ -109,7 +109,7 @@ export default function TemplateEditor({
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId: brand.id, layout, ...(customTopic ? { customTopic } : {}) }),
+        body: JSON.stringify({ brandId: brand.id, layout, format, ...(customTopic ? { customTopic } : {}) }),
       });
       const data = await res.json();
       if (data.title) setTitle(data.title);
@@ -336,9 +336,8 @@ export default function TemplateEditor({
           />
         </div>
 
-        {/* Subtitle (layouts 1, 2) */}
-        {(layout === 1 || layout === 2) && (
-          <div>
+        {/* Subtitle */}
+        <div>
             <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
               Subtitulo
             </label>
@@ -349,8 +348,7 @@ export default function TemplateEditor({
               placeholder="Subtitulo"
               className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-accent"
             />
-          </div>
-        )}
+        </div>
 
         {/* Caption */}
         <div>
