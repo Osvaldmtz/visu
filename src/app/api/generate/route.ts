@@ -188,7 +188,7 @@ async function getNextScheduledDate(
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const { brandId, layout, excludeDates, customTopic } = await request.json();
+  const { brandId, layout, excludeDates, customTopic, skipBackground } = await request.json();
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -235,9 +235,9 @@ export async function POST(request: Request) {
       await supabase.from("post_topics").insert({ brand_id: brandId, topic });
     }
 
-    // Generate background image with FAL.ai for layouts 0, 1, 3
+    // Generate background image with Gemini for layouts 0, 1, 3
     let backgroundUrl: string | null = null;
-    if (needsBackground && content.bg_prompt) {
+    if (needsBackground && content.bg_prompt && !skipBackground) {
       backgroundUrl = await generateGeminiBackground(
         content.bg_prompt,
         brand.primary_color ?? "#7C3DE3"

@@ -1,0 +1,2 @@
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS default_format text NOT NULL DEFAULT 'square';
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS format text NOT NULL DEFAULT 'square';

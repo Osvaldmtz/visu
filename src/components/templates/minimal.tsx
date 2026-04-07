@@ -6,6 +6,7 @@ interface MinimalProps {
   subtitle: string;
   logoUrl: string;
   primaryColor: string;
+  height?: number;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
@@ -17,6 +18,7 @@ export default function MinimalTemplate({
   subtitle,
   logoUrl,
   primaryColor,
+  height = 1080,
   draggable,
   scale,
   positions,
@@ -26,7 +28,7 @@ export default function MinimalTemplate({
     <div
       style={{
         width: 1080,
-        height: 1080,
+        height,
         position: "relative",
         overflow: "hidden",
         fontFamily: "Inter, system-ui, sans-serif",

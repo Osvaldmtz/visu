@@ -8,18 +8,19 @@ interface OverlayProps {
   primaryColor: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
+  height?: number;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
   onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
-export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, overlayFilter = "purple", draggable, scale, positions, onDragStop }: OverlayProps) {
+export default function OverlayTemplate({ title, logoUrl, primaryColor, backgroundUrl, overlayFilter = "purple", height = 1080, draggable, scale, positions, onDragStop }: OverlayProps) {
   return (
     <div
       style={{
         width: 1080,
-        height: 1080,
+        height,
         position: "relative",
         overflow: "hidden",
         fontFamily: "Inter, system-ui, sans-serif",

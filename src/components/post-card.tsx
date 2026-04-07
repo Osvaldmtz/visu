@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { renderTemplate } from "./templates";
 import type { OverlayFilter } from "./templates";
 import { toDataUrl } from "@/lib/image-utils";
+import { FORMATS, type PostFormat } from "@/lib/formats";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-yellow-500/20 text-yellow-400",
@@ -58,6 +59,9 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
 
   const [logoDataUrl, setLogoDataUrl] = useState("");
 
+  const fmt = ((post.format ?? "square") as PostFormat);
+  const fmtData = FORMATS[fmt] ?? FORMATS.square;
+
   const rawLogoUrl = canRenderLive
     ? (post.layout <= 1
         ? brand.logo_light_url || brand.logo_url || ""
@@ -75,12 +79,12 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
   return (
     <div className="bg-surface-light border border-surface-border rounded-xl overflow-hidden hover:border-accent/50 transition-colors group relative">
       {canRenderLive ? (
-        <div ref={thumbRef} className="aspect-square bg-neutral-800 relative overflow-hidden">
+        <div ref={thumbRef} className="bg-neutral-800 relative overflow-hidden" style={{ aspectRatio: fmtData.ratio }}>
           {thumbScale > 0 && (
           <div
             style={{
               width: 1080,
-              height: 1080,
+              height: fmtData.height,
               transform: `scale(${thumbScale})`,
               transformOrigin: "top left",
               position: "absolute",
@@ -96,6 +100,7 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
               backgroundUrl: post.background_url || undefined,
               overlayFilter: (post.overlay_filter ?? "purple") as OverlayFilter,
               cardOpacity: post.card_opacity ?? 0.9,
+              height: fmtData.height,
               positions: post.positions ?? undefined,
             })}
           </div>

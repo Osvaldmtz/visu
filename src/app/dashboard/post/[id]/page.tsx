@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toPng } from "html-to-image";
 import { renderTemplate, type OverlayFilter } from "@/components/templates";
 import { toDataUrl } from "@/lib/image-utils";
+import { FORMATS, type PostFormat } from "@/lib/formats";
 
 export default function PostReviewPage() {
   const { id } = useParams();
@@ -38,6 +39,7 @@ export default function PostReviewPage() {
   const [suggestedLabel, setSuggestedLabel] = useState("");
   const [overlayFilter, setOverlayFilter] = useState<OverlayFilter>("purple");
   const [cardOpacity, setCardOpacity] = useState(0.9);
+  const [postFormat, setPostFormat] = useState<PostFormat>("square");
 
   useEffect(() => {
     const load = async () => {
@@ -101,6 +103,7 @@ export default function PostReviewPage() {
         }
         setOverlayFilter((postData.overlay_filter ?? "purple") as OverlayFilter);
         setCardOpacity(postData.card_opacity ?? 0.9);
+        setPostFormat((postData.format ?? "square") as PostFormat);
 
         // If post has template data, enable interactive mode
         if (brandData && postData.title) {
@@ -269,7 +272,7 @@ export default function PostReviewPage() {
 
       const dataUrl = await toPng(canvasRef.current, {
         width: 1080,
-        height: 1080,
+        height: canvasHeight,
         pixelRatio: 1,
         cacheBust: true,
         style: { transform: "none" },
@@ -291,6 +294,7 @@ export default function PostReviewPage() {
       if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
       formData.append("overlay_filter", overlayFilter);
       formData.append("card_opacity", String(cardOpacity));
+      formData.append("format", postFormat);
 
       const uploadRes = await fetch("/api/approve-post", {
         method: "POST",
@@ -321,7 +325,7 @@ export default function PostReviewPage() {
 
       const dataUrl = await toPng(canvasRef.current, {
         width: 1080,
-        height: 1080,
+        height: canvasHeight,
         pixelRatio: 1,
         cacheBust: true,
         style: { transform: "none" },
@@ -343,6 +347,7 @@ export default function PostReviewPage() {
       if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
       formData.append("overlay_filter", overlayFilter);
       formData.append("card_opacity", String(cardOpacity));
+      formData.append("format", postFormat);
       if (scheduleDate) {
         formData.append("scheduled_at", `${scheduleDate}T${scheduleTime}:00Z`);
       }
@@ -379,7 +384,7 @@ export default function PostReviewPage() {
       try {
         const dataUrl = await toPng(regenCanvasRef.current, {
           width: 1080,
-          height: 1080,
+          height: canvasHeight,
           pixelRatio: 1,
           cacheBust: true,
         });
@@ -438,6 +443,8 @@ export default function PostReviewPage() {
     setHasDragChanges(true);
   };
 
+  const canvasHeight = FORMATS[postFormat].height;
+
   const templateProps = {
     title,
     subtitle: post.subtitle ?? "",
@@ -446,6 +453,7 @@ export default function PostReviewPage() {
     backgroundUrl: bgDataUrl || undefined,
     overlayFilter,
     cardOpacity,
+    height: canvasHeight,
     draggable: true,
     scale,
     positions,
@@ -469,14 +477,14 @@ export default function PostReviewPage() {
               <div
                 ref={wrapperRef}
                 className="relative bg-neutral-900 rounded-xl overflow-hidden border border-surface-border"
-                style={{ aspectRatio: "1/1" }}
+                style={{ aspectRatio: FORMATS[postFormat].ratio }}
               >
                 <div
                   ref={canvasRef}
                   key={resetKey}
                   style={{
                     width: 1080,
-                    height: 1080,
+                    height: canvasHeight,
                     transform: `scale(${scale})`,
                     transformOrigin: "top left",
                     position: "absolute",
@@ -747,7 +755,7 @@ export default function PostReviewPage() {
             top: 0,
             left: 0,
             width: 1080,
-            height: 1080,
+            height: canvasHeight,
             overflow: "hidden",
             pointerEvents: "none",
             opacity: 0,
@@ -755,7 +763,7 @@ export default function PostReviewPage() {
           }}
           aria-hidden="true"
         >
-          <div ref={regenCanvasRef} style={{ width: 1080, height: 1080 }}>
+          <div ref={regenCanvasRef} style={{ width: 1080, height: canvasHeight }}>
             {renderTemplate(post.layout, {
               title: regenData.title,
               subtitle: regenData.subtitle,

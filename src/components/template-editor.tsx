@@ -4,6 +4,7 @@ import React, { useRef, useState, useCallback, useEffect } from "react";
 import { toPng } from "html-to-image";
 import { renderTemplate, TEMPLATE_NAMES, type OverlayFilter } from "./templates";
 import { toDataUrl } from "@/lib/image-utils";
+import { FORMATS, type PostFormat } from "@/lib/formats";
 
 interface Brand {
   id: string;
@@ -16,6 +17,7 @@ interface Brand {
   font_family: string;
   active_layouts: number[];
   default_overlay_filter?: string;
+  default_format?: string;
 }
 
 interface TemplateEditorProps {
@@ -62,6 +64,7 @@ export default function TemplateEditor({
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [overlayFilter, setOverlayFilter] = useState<OverlayFilter>((brand.default_overlay_filter as OverlayFilter) ?? "purple");
   const [cardOpacity, setCardOpacity] = useState(0.9);
+  const [format, setFormat] = useState<PostFormat>((brand.default_format as PostFormat) ?? "square");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pick the right logo variant based on layout
@@ -83,6 +86,8 @@ export default function TemplateEditor({
     setPositions((prev) => ({ ...prev, [elementId]: pos }));
   }, []);
 
+  const canvasHeight = FORMATS[format].height;
+
   const templateProps = {
     title: title || "Tu titulo aqui",
     subtitle,
@@ -91,6 +96,7 @@ export default function TemplateEditor({
     backgroundUrl: backgroundUrl || undefined,
     overlayFilter,
     cardOpacity,
+    height: canvasHeight,
     draggable: true,
     scale,
     positions,
@@ -144,7 +150,7 @@ export default function TemplateEditor({
     try {
       const dataUrl = await toPng(canvasRef.current, {
         width: 1080,
-        height: 1080,
+        height: canvasHeight,
         pixelRatio: 1,
         cacheBust: true,
         style: { transform: "none" },
@@ -154,7 +160,7 @@ export default function TemplateEditor({
     } finally {
       setExporting(false);
     }
-  }, []);
+  }, [canvasHeight]);
 
   const handleExport = async () => {
     const blob = await exportToPng();
@@ -185,6 +191,7 @@ export default function TemplateEditor({
     if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
     formData.append("overlay_filter", overlayFilter);
     formData.append("card_opacity", String(cardOpacity));
+    formData.append("format", format);
 
     const res = await fetch("/api/approve-post", {
       method: "POST",
@@ -236,13 +243,13 @@ export default function TemplateEditor({
         <div
           ref={wrapperRef}
           className="relative bg-neutral-900 rounded-xl overflow-hidden border border-surface-border"
-          style={{ aspectRatio: "1/1", maxWidth: 600 }}
+          style={{ aspectRatio: FORMATS[format].ratio, maxWidth: 600 }}
         >
           <div
             ref={canvasRef}
             style={{
               width: 1080,
-              height: 1080,
+              height: canvasHeight,
               transform: `scale(${scale})`,
               transformOrigin: "top left",
               position: "absolute",
@@ -288,6 +295,28 @@ export default function TemplateEditor({
                 }`}
               >
                 {name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Format selector */}
+        <div>
+          <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+            Formato
+          </label>
+          <div className="flex gap-2">
+            {(Object.keys(FORMATS) as PostFormat[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setFormat(key)}
+                className={`flex-1 text-xs py-2 rounded-lg border transition-colors ${
+                  format === key
+                    ? "border-accent bg-accent/10 text-accent"
+                    : "border-surface-border bg-surface-light text-neutral-400 hover:text-white"
+                }`}
+              >
+                {FORMATS[key].label}
               </button>
             ))}
           </div>

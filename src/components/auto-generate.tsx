@@ -5,6 +5,8 @@ import { toPng } from "html-to-image";
 import { useRouter } from "next/navigation";
 import { renderTemplate, type OverlayFilter } from "./templates";
 import { toDataUrl } from "@/lib/image-utils";
+import { FORMATS, type PostFormat } from "@/lib/formats";
+import AutoGenerateModal, { type AutoGenerateConfig } from "./auto-generate-modal";
 
 interface Brand {
   id: string;
@@ -16,6 +18,7 @@ interface Brand {
   active_layouts: number[];
   posts_per_week?: number;
   default_overlay_filter?: string;
+  default_format?: string;
 }
 
 interface PendingPost {
@@ -46,6 +49,17 @@ export default function AutoGenerate({
   const [pendingRender, setPendingRender] = useState<PendingPost | null>(null);
   const [queue, setQueue] = useState<PendingPost[]>([]);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [showModal, setShowModal] = useState(false);
+
+  // Config from modal (or defaults for single mode)
+  const [config, setConfig] = useState<AutoGenerateConfig>({
+    totalPosts: 1,
+    format: (brand.default_format as PostFormat) ?? "square",
+    overlayFilter: (brand.default_overlay_filter as OverlayFilter) ?? "purple",
+    generateImages: true,
+  });
+
+  const canvasHeight = FORMATS[config.format]?.height ?? 1080;
 
   const pickLayout = useCallback(() => {
     const layouts = brand.active_layouts ?? [0];
@@ -72,7 +86,7 @@ export default function AutoGenerate({
 
       try {
         const dataUrl = await toPng(canvasRef.current, {
-          width: 1080, height: 1080, pixelRatio: 1, cacheBust: true,
+          width: 1080, height: canvasHeight, pixelRatio: 1, cacheBust: true,
         });
 
         setStatus("uploading");
@@ -89,7 +103,8 @@ export default function AutoGenerate({
         if (pendingRender.subtitle) formData.append("subtitle", pendingRender.subtitle);
         if (pendingRender.backgroundUrl) formData.append("background_url", pendingRender.backgroundUrl);
         if (pendingRender.scheduledAt) formData.append("scheduled_at", pendingRender.scheduledAt);
-        formData.append("overlay_filter", brand.default_overlay_filter || "purple");
+        formData.append("overlay_filter", config.overlayFilter);
+        formData.append("format", config.format);
 
         const uploadRes = await fetch("/api/approve-post", { method: "POST", body: formData });
         if (!uploadRes.ok) throw new Error("Upload failed");
@@ -127,13 +142,13 @@ export default function AutoGenerate({
 
     captureAndUpload();
     return () => { localCancelled = true; };
-  }, [pendingRender, brand.id, router]);
+  }, [pendingRender, brand.id, canvasHeight, config.overlayFilter, config.format, router]);
 
-  const generateOnePost = async (logoDataUrl: string, layout: number, excludeDates: string[]): Promise<PendingPost> => {
+  const generateOnePost = async (logoDataUrl: string, layout: number, excludeDates: string[], skipBackground: boolean): Promise<PendingPost> => {
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brandId: brand.id, layout, excludeDates }),
+      body: JSON.stringify({ brandId: brand.id, layout, excludeDates, skipBackground }),
     });
     if (!res.ok) {
       const err = await res.json();
@@ -157,13 +172,14 @@ export default function AutoGenerate({
     };
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (cfg: AutoGenerateConfig) => {
+    setConfig(cfg);
+    setShowModal(false);
     cancelledRef.current = false;
     setStatus("generating");
     setError("");
 
-    // posts_per_week × 4 weeks = total posts for the month
-    const totalPosts = mode === "batch" ? (brand.posts_per_week ?? 1) * 4 : 1;
+    const totalPosts = cfg.totalPosts;
     setProgress({ current: 0, total: totalPosts });
 
     try {
@@ -183,7 +199,7 @@ export default function AutoGenerate({
         setStatus(`generating ${i + 1}/${totalPosts}`);
         const layout = pickLayout();
         const logoDataUrl = layout <= 1 ? lightDataUrl : darkDataUrl;
-        const post = await generateOnePost(logoDataUrl, layout, claimedDates);
+        const post = await generateOnePost(logoDataUrl, layout, claimedDates, !cfg.generateImages);
         posts.push(post);
         if (post.scheduledAt) claimedDates.push(post.scheduledAt);
       }
@@ -207,10 +223,23 @@ export default function AutoGenerate({
     }
   };
 
+  const handleButtonClick = () => {
+    if (mode === "batch") {
+      setShowModal(true);
+    } else {
+      // Single mode: generate 1 post with brand defaults
+      handleGenerate({
+        totalPosts: 1,
+        format: (brand.default_format as PostFormat) ?? "square",
+        overlayFilter: (brand.default_overlay_filter as OverlayFilter) ?? "purple",
+        generateImages: true,
+      });
+    }
+  };
+
   const handleCancel = () => {
     cancelledRef.current = true;
     setQueue([]);
-    // Let current in-flight post finish, then stop
   };
 
   const isWorking = status !== "idle" && status !== "done" && status !== "error";
@@ -230,7 +259,7 @@ export default function AutoGenerate({
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={handleGenerate}
+        onClick={handleButtonClick}
         disabled={isWorking}
         className={`disabled:opacity-50 font-medium px-5 py-2.5 rounded-lg transition-colors text-sm flex items-center gap-2 ${
           mode === "batch"
@@ -260,19 +289,29 @@ export default function AutoGenerate({
         <p className="text-xs text-red-400">{error}</p>
       )}
 
+      {showModal && (
+        <AutoGenerateModal
+          defaultFormat={(brand.default_format as PostFormat) ?? "square"}
+          defaultOverlayFilter={(brand.default_overlay_filter as OverlayFilter) ?? "purple"}
+          onConfirm={handleGenerate}
+          onCancel={() => setShowModal(false)}
+        />
+      )}
+
       {pendingRender && (
         <div
-          style={{ position: "fixed", top: 0, left: 0, width: 1080, height: 1080, overflow: "hidden", pointerEvents: "none", opacity: 0, zIndex: -1 }}
+          style={{ position: "fixed", top: 0, left: 0, width: 1080, height: canvasHeight, overflow: "hidden", pointerEvents: "none", opacity: 0, zIndex: -1 }}
           aria-hidden="true"
         >
-          <div ref={canvasRef} style={{ width: 1080, height: 1080 }}>
+          <div ref={canvasRef} style={{ width: 1080, height: canvasHeight }}>
             {renderTemplate(pendingRender.layout, {
               title: pendingRender.title,
               subtitle: pendingRender.subtitle,
               logoUrl: pendingRender.logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
               backgroundUrl: pendingRender.bgDataUrl || undefined,
-              overlayFilter: (brand.default_overlay_filter as OverlayFilter) ?? "purple",
+              overlayFilter: config.overlayFilter,
+              height: canvasHeight,
             })}
           </div>
         </div>

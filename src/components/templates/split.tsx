@@ -9,6 +9,7 @@ interface SplitProps {
   primaryColor: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
+  height?: number;
   draggable?: boolean;
   scale?: number;
   positions?: Record<string, { x: number; y: number }>;
@@ -22,6 +23,7 @@ export default function SplitTemplate({
   primaryColor,
   backgroundUrl,
   overlayFilter = "none",
+  height = 1080,
   draggable,
   scale,
   positions,
@@ -31,7 +33,7 @@ export default function SplitTemplate({
     <div
       style={{
         width: 1080,
-        height: 1080,
+        height,
         position: "relative",
         overflow: "hidden",
         fontFamily: "Inter, system-ui, sans-serif",

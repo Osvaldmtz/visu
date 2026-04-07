@@ -62,6 +62,7 @@ export default function SettingsPage() {
   const [brandSkillUpdatedAt, setBrandSkillUpdatedAt] = useState<string | null>(null);
   const [savingSkill, setSavingSkill] = useState(false);
   const [defaultOverlayFilter, setDefaultOverlayFilter] = useState("purple");
+  const [defaultFormat, setDefaultFormat] = useState("square");
 
   useEffect(() => {
     const load = async () => {
@@ -106,6 +107,7 @@ export default function SettingsPage() {
       setBrandSkill(data.brand_skill || "");
       setBrandSkillUpdatedAt(data.brand_skill_updated_at || null);
       setDefaultOverlayFilter(data.default_overlay_filter || "purple");
+      setDefaultFormat(data.default_format || "square");
     };
     load();
   }, [router]);
@@ -155,6 +157,7 @@ export default function SettingsPage() {
         content_topics: contentTopics || null,
         topics_to_avoid: topicsToAvoid || null,
         default_overlay_filter: defaultOverlayFilter,
+        default_format: defaultFormat,
       })
       .eq("id", brand.id);
     setSaving(false);
@@ -320,6 +323,28 @@ export default function SettingsPage() {
                 ))}
               </select>
             </Field>
+            <div>
+              <span className="text-xs text-neutral-500 mb-2 block">Formato por defecto</span>
+              <div className="flex gap-1.5">
+                {([
+                  ["square", "1080 x 1080"],
+                  ["portrait", "1080 x 1350"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setDefaultFormat(value)}
+                    className={`px-3 py-2 rounded-lg text-xs transition-colors ${
+                      defaultFormat === value
+                        ? "border-accent bg-accent/10 text-accent border"
+                        : "border border-surface-border bg-surface-light text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div>
               <span className="text-xs text-neutral-500 mb-2 block">Overlay por defecto</span>
               <div className="flex gap-1.5">

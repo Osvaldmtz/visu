@@ -19,6 +19,7 @@ export async function POST(request: Request) {
   const positionsField = formData.get("positions") as string | null;
   const overlayFilter = formData.get("overlay_filter") as string | null;
   const cardOpacityField = formData.get("card_opacity") as string | null;
+  const formatField = formData.get("format") as string | null;
 
   if (!file || !brandId) {
     return NextResponse.json({ error: "Missing file or brandId" }, { status: 400 });
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
     positions: positionsField ? JSON.parse(positionsField) : null,
     overlay_filter: overlayFilter || "purple",
     card_opacity: cardOpacityField ? parseFloat(cardOpacityField) : 0.9,
+    format: formatField || "square",
   };
 
   if (scheduledAt) {
