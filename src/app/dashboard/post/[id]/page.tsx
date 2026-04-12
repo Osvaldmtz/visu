@@ -18,6 +18,8 @@ export default function PostReviewPage() {
   const [brand, setBrand] = useState<any>(null);
   const [caption, setCaption] = useState("");
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [bodyText, setBodyText] = useState("");
   const [loading, setLoading] = useState("");
   const [regenData, setRegenData] = useState<any>(null);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -37,6 +39,10 @@ export default function PostReviewPage() {
   const [aiSuggestion, setAiSuggestion] = useState<{ days?: number[]; time?: string; reason?: string } | null>(null);
   const [showManualDate, setShowManualDate] = useState(false);
   const [suggestedLabel, setSuggestedLabel] = useState("");
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [titleSize, setTitleSize] = useState(72);
+  const [subtitleSize, setSubtitleSize] = useState(28);
+  const [bodySize, setBodySize] = useState(20);
   const [overlayFilter, setOverlayFilter] = useState<OverlayFilter>("purple");
   const [cardOpacity, setCardOpacity] = useState(0.9);
   const [postFormat, setPostFormat] = useState<PostFormat>("square");
@@ -53,17 +59,22 @@ export default function PostReviewPage() {
         setPost(postData);
         setCaption(postData.caption);
         setTitle(postData.title || "");
-        if (postData.scheduled_at) {
-          const d = new Date(postData.scheduled_at);
-          setScheduleDate(d.toISOString().split("T")[0]);
-          setScheduleTime(d.toISOString().split("T")[1].slice(0, 5));
-        }
+        setSubtitle(postData.subtitle || "");
+        setBodyText(postData.body_text || "");
         const { data: brandData } = await supabase
           .from("brands")
           .select("*")
           .eq("id", postData.brand_id)
           .single();
         setBrand(brandData);
+        if (postData.scheduled_at) {
+          const tz = brandData?.timezone || "America/Mexico_City";
+          const d = new Date(postData.scheduled_at);
+          const localDate = d.toLocaleDateString("sv-SE", { timeZone: tz }); // YYYY-MM-DD
+          const localTime = d.toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }); // HH:MM
+          setScheduleDate(localDate);
+          setScheduleTime(localTime);
+        }
 
         // Fetch AI schedule recommendation
         if (brandData && !postData.scheduled_at) {
@@ -101,6 +112,9 @@ export default function PostReviewPage() {
         if (postData.positions) {
           setPositions(postData.positions);
         }
+        setTitleSize(postData.title_size ?? 72);
+        setSubtitleSize(postData.subtitle_size ?? 28);
+        setBodySize(postData.body_size ?? 20);
         setOverlayFilter((postData.overlay_filter ?? "purple") as OverlayFilter);
         setCardOpacity(postData.card_opacity ?? 0.9);
         setPostFormat((postData.format ?? "square") as PostFormat);
@@ -169,28 +183,67 @@ export default function PostReviewPage() {
     router.refresh();
   };
 
+  const localToUtc = (date: string, time: string): string => {
+    const tz = brand?.timezone || "America/Mexico_City";
+    // Use a known UTC reference point to calculate the timezone offset
+    const ref = new Date(`${date}T12:00:00Z`); // noon UTC as reference
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hour: "numeric", minute: "numeric", hour12: false,
+      year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    const parts = fmt.formatToParts(ref);
+    const g = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? "0");
+    // What does noon UTC look like in the target tz?
+    const tzAtRef = g("hour") * 60 + g("minute"); // e.g. 420 for 7:00 AM (UTC-5)
+    const utcAtRef = 12 * 60; // 720
+    const offsetMins = tzAtRef - utcAtRef; // e.g. -300 for UTC-5
+    // User entered time is in brand tz. Convert to UTC by subtracting offset.
+    const [h, m] = time.split(":").map(Number);
+    const userMins = h * 60 + m; // minutes since midnight in brand tz
+    const utcMins = userMins - offsetMins; // minutes since midnight in UTC
+    // Build UTC date
+    const utcDate = new Date(`${date}T00:00:00Z`);
+    utcDate.setUTCMinutes(utcMins);
+    return utcDate.toISOString();
+  };
+
   const handleSchedule = async () => {
     if (!scheduleDate) return;
     setLoading("SCHEDULE");
-    const scheduledAt = `${scheduleDate}T${scheduleTime}:00Z`;
-    const supabase = createClient();
-    await supabase
-      .from("posts")
-      .update({ status: "SCHEDULED", caption, scheduled_at: scheduledAt })
-      .eq("id", id);
-    router.push("/dashboard");
-    router.refresh();
+    try {
+      const scheduledAt = localToUtc(scheduleDate, scheduleTime);
+      const res = await fetch("/api/schedule-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: post.id, scheduledAt, caption, title }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Schedule failed");
+      }
+      router.push("/dashboard");
+      router.refresh();
+    } catch (e: any) {
+      console.error("Schedule error:", e);
+      setPublishError(e.message);
+      setLoading("");
+    }
   };
 
   const handleUnschedule = async () => {
     setLoading("UNSCHEDULE");
-    const supabase = createClient();
-    await supabase
-      .from("posts")
-      .update({ status: "APPROVED", scheduled_at: null })
-      .eq("id", id);
-    router.push("/dashboard");
-    router.refresh();
+    try {
+      await fetch("/api/schedule-post", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: post.id }),
+      });
+      router.push("/dashboard");
+      router.refresh();
+    } catch (e: any) {
+      console.error("Unschedule error:", e);
+      setLoading("");
+    }
   };
 
   const handlePublishNow = async () => {
@@ -272,6 +325,36 @@ export default function PostReviewPage() {
     }
   };
 
+  const handleRegenerateImage = async () => {
+    if (!brand || !post) return;
+    setGeneratingImage(true);
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          caption,
+          primaryColor: brand.primary_color ?? "#7C3DE3",
+          format: postFormat,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      if (data.backgroundUrl) {
+        const dataUrl = await toDataUrl(data.backgroundUrl);
+        setBgDataUrl(dataUrl);
+        setPost({ ...post, background_url: data.backgroundUrl });
+        setHasDragChanges(true);
+      }
+    } catch (e: any) {
+      console.error("Regenerate image error:", e);
+      setPublishError(e.message || "Error al regenerar imagen");
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
   // Save position: re-export PNG with new drag positions, keep current status
   const handleSavePosition = useCallback(async () => {
     if (!canvasRef.current || !brand || !post) return;
@@ -300,11 +383,15 @@ export default function PostReviewPage() {
       formData.append("caption", caption);
       formData.append("postId", post.id);
       formData.append("status", post.status);
-      if (post.subtitle) formData.append("subtitle", post.subtitle);
+      if (subtitle) formData.append("subtitle", subtitle);
+      if (bodyText) formData.append("body_text", bodyText);
       if (post.background_url) formData.append("background_url", post.background_url);
       if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
       formData.append("overlay_filter", overlayFilter);
       formData.append("card_opacity", String(cardOpacity));
+      formData.append("title_size", String(titleSize));
+      formData.append("subtitle_size", String(subtitleSize));
+      formData.append("body_size", String(bodySize));
       formData.append("format", postFormat);
 
       const uploadRes = await fetch("/api/approve-post", {
@@ -353,14 +440,18 @@ export default function PostReviewPage() {
       formData.append("caption", caption);
       formData.append("postId", post.id);
       formData.append("status", "APPROVED");
-      if (post.subtitle) formData.append("subtitle", post.subtitle);
+      if (subtitle) formData.append("subtitle", subtitle);
+      if (bodyText) formData.append("body_text", bodyText);
       if (post.background_url) formData.append("background_url", post.background_url);
       if (Object.keys(positions).length > 0) formData.append("positions", JSON.stringify(positions));
       formData.append("overlay_filter", overlayFilter);
       formData.append("card_opacity", String(cardOpacity));
+      formData.append("title_size", String(titleSize));
+      formData.append("subtitle_size", String(subtitleSize));
+      formData.append("body_size", String(bodySize));
       formData.append("format", postFormat);
       if (scheduleDate) {
-        formData.append("scheduled_at", `${scheduleDate}T${scheduleTime}:00Z`);
+        formData.append("scheduled_at", localToUtc(scheduleDate, scheduleTime));
       }
 
       const uploadRes = await fetch("/api/approve-post", {
@@ -418,6 +509,9 @@ export default function PostReviewPage() {
         }
         formData.append("overlay_filter", overlayFilter);
         formData.append("card_opacity", String(cardOpacity));
+      formData.append("title_size", String(titleSize));
+      formData.append("subtitle_size", String(subtitleSize));
+      formData.append("body_size", String(bodySize));
         formData.append("format", postFormat);
 
         const uploadRes = await fetch("/api/approve-post", {
@@ -461,12 +555,16 @@ export default function PostReviewPage() {
 
   const templateProps = {
     title,
-    subtitle: post.subtitle ?? "",
+    subtitle,
+    bodyText,
     logoUrl: logoDataUrl || "",
     primaryColor: brand.primary_color ?? "#7C3DE3",
     backgroundUrl: bgDataUrl || undefined,
     overlayFilter,
     cardOpacity,
+    titleSize,
+    subtitleSize,
+    bodySize,
     height: canvasHeight,
     draggable: true,
     scale,
@@ -581,6 +679,47 @@ export default function PostReviewPage() {
                     className="w-full accent-accent"
                   />
                 </div>
+
+                {/* Font sizes */}
+                <div>
+                  <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                    Titulo — {titleSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="40"
+                    max="120"
+                    value={titleSize}
+                    onChange={(e) => { setTitleSize(Number(e.target.value)); setHasDragChanges(true); }}
+                    className="w-full accent-accent"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                    Subtitulo — {subtitleSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="16"
+                    max="48"
+                    value={subtitleSize}
+                    onChange={(e) => { setSubtitleSize(Number(e.target.value)); setHasDragChanges(true); }}
+                    className="w-full accent-accent"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+                    Body text — {bodySize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="12"
+                    max="32"
+                    value={bodySize}
+                    onChange={(e) => { setBodySize(Number(e.target.value)); setHasDragChanges(true); }}
+                    className="w-full accent-accent"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -601,10 +740,39 @@ export default function PostReviewPage() {
             )}
             <span className="text-xs text-neutral-500 mb-4">
               Layout {post.layout} &middot; {post.status}
-              {(post.status === "SCHEDULED" || post.status === "PUBLISHED") && post.scheduled_at && (
-                <> &middot; {new Date(post.scheduled_at).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</>
-              )}
+              {(post.status === "SCHEDULED" || post.status === "PUBLISHED") && post.scheduled_at && (() => {
+                const tz = brand.timezone || "America/Mexico_City";
+                const tzLabel = tz.replace("America/", "").replace(/_/g, " ");
+                const formatted = new Date(post.scheduled_at).toLocaleString("es-MX", { timeZone: tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true });
+                return <> &middot; {formatted} ({tzLabel})</>;
+              })()}
             </span>
+
+            {!isPublished && (
+              <div className="mb-2">
+                <label className="text-sm text-neutral-400 mb-1 block">Subtitulo</label>
+                <input
+                  type="text"
+                  value={subtitle}
+                  onChange={(e) => { setSubtitle(e.target.value); setHasDragChanges(true); }}
+                  placeholder="Subtitulo"
+                  className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-accent"
+                />
+              </div>
+            )}
+
+            {!isPublished && (
+              <div className="mb-4">
+                <label className="text-sm text-neutral-400 mb-1 block">Body text</label>
+                <textarea
+                  value={bodyText}
+                  onChange={(e) => { setBodyText(e.target.value); setHasDragChanges(true); }}
+                  rows={3}
+                  placeholder="Parrafo corto de 2-4 lineas..."
+                  className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent"
+                />
+              </div>
+            )}
 
             <label className="text-sm text-neutral-400 mb-2">Caption</label>
             <textarea
@@ -672,7 +840,9 @@ export default function PostReviewPage() {
                     </div>
                   ) : (
                     <div>
-                      <label className="text-xs text-neutral-500 mb-2 block">Fecha y hora</label>
+                      <label className="text-xs text-neutral-500 mb-2 block">
+                        Fecha y hora ({(brand.timezone || "America/Mexico_City").replace("America/", "").replace(/_/g, " ")})
+                      </label>
                       <div className="flex gap-2">
                         <input
                           type="date"
@@ -743,10 +913,19 @@ export default function PostReviewPage() {
               {!isPublished && (
                 <button
                   onClick={handleRegenerate}
-                  disabled={!!loading}
+                  disabled={!!loading || generatingImage}
                   className="flex-1 bg-surface-light hover:bg-surface-border disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors text-sm border border-surface-border"
                 >
                   {loading === "REGENERATE" ? "Regenerando..." : "Regenerar"}
+                </button>
+              )}
+              {!isPublished && (
+                <button
+                  onClick={handleRegenerateImage}
+                  disabled={!!loading || generatingImage}
+                  className="flex-1 bg-surface-light hover:bg-surface-border disabled:opacity-50 text-neutral-300 font-medium py-3 rounded-lg transition-colors text-sm border border-surface-border"
+                >
+                  {generatingImage ? "Generando..." : "Regenerar imagen"}
                 </button>
               )}
               {!isPublished && (

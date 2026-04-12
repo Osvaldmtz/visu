@@ -5,10 +5,14 @@ import type { OverlayFilter } from "./index";
 interface PhotoProps {
   title: string;
   subtitle?: string;
+  bodyText?: string;
   logoUrl: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
   cardOpacity?: number;
+  titleSize?: number;
+  subtitleSize?: number;
+  bodySize?: number;
   height?: number;
   draggable?: boolean;
   scale?: number;
@@ -19,10 +23,14 @@ interface PhotoProps {
 export default function PhotoTemplate({
   title,
   subtitle,
+  bodyText,
   logoUrl,
   backgroundUrl,
   overlayFilter = "none",
   cardOpacity = 0.9,
+  titleSize = 72,
+  subtitleSize = 28,
+  bodySize = 20,
   height = 1080,
   draggable,
   scale,
@@ -105,7 +113,7 @@ export default function PhotoTemplate({
             <h1
               style={{
                 color: "#1A1A2E",
-                fontSize: 68,
+                fontSize: titleSize,
                 fontWeight: 700,
                 lineHeight: 1.1,
                 margin: 0,
@@ -117,13 +125,27 @@ export default function PhotoTemplate({
               <p
                 style={{
                   color: "#6B7280",
-                  fontSize: 24,
-                  fontWeight: 400,
+                  fontSize: subtitleSize,
+                  fontWeight: 500,
                   margin: 0,
                   marginTop: 12,
                 }}
               >
                 {subtitle}
+              </p>
+            )}
+            {bodyText && (
+              <p
+                style={{
+                  color: "#9CA3AF",
+                  fontSize: bodySize,
+                  fontWeight: 400,
+                  lineHeight: 1.5,
+                  margin: 0,
+                  marginTop: 10,
+                }}
+              >
+                {bodyText}
               </p>
             )}
           </div>

@@ -4,8 +4,12 @@ import DraggableElement from "./draggable-element";
 interface MinimalProps {
   title: string;
   subtitle: string;
+  bodyText?: string;
   logoUrl: string;
   primaryColor: string;
+  titleSize?: number;
+  subtitleSize?: number;
+  bodySize?: number;
   height?: number;
   draggable?: boolean;
   scale?: number;
@@ -18,6 +22,10 @@ export default function MinimalTemplate({
   subtitle,
   logoUrl,
   primaryColor,
+  bodyText,
+  titleSize = 72,
+  subtitleSize = 28,
+  bodySize = 20,
   height = 1080,
   draggable,
   scale,
@@ -64,7 +72,7 @@ export default function MinimalTemplate({
         <h1
           style={{
             color: "#1A1A2E",
-            fontSize: 100,
+            fontSize: titleSize,
             fontWeight: 700,
             lineHeight: 1.05,
             margin: 0,
@@ -90,12 +98,28 @@ export default function MinimalTemplate({
           <p
             style={{
               color: "#6B7280",
-              fontSize: 32,
-              fontWeight: 400,
+              fontSize: subtitleSize,
+              fontWeight: 500,
               margin: 0,
             }}
           >
             {subtitle}
+          </p>
+        )}
+
+        {/* Body text */}
+        {bodyText && (
+          <p
+            style={{
+              color: "#9CA3AF",
+              fontSize: bodySize,
+              fontWeight: 400,
+              lineHeight: 1.5,
+              margin: 0,
+              marginTop: 16,
+            }}
+          >
+            {bodyText}
           </p>
         )}
       </DraggableElement>

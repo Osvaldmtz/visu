@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const title = formData.get("title") as string;
   const caption = formData.get("caption") as string;
   const subtitle = formData.get("subtitle") as string | null;
+  const bodyTextField = formData.get("body_text") as string | null;
   const backgroundUrlField = formData.get("background_url") as string | null;
   const postId = formData.get("postId") as string | null;
   const scheduledAt = formData.get("scheduled_at") as string | null;
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
   const positionsField = formData.get("positions") as string | null;
   const overlayFilter = formData.get("overlay_filter") as string | null;
   const cardOpacityField = formData.get("card_opacity") as string | null;
+  const titleSizeField = formData.get("title_size") as string | null;
+  const subtitleSizeField = formData.get("subtitle_size") as string | null;
+  const bodySizeField = formData.get("body_size") as string | null;
   const formatField = formData.get("format") as string | null;
 
   if (!file || !brandId) {
@@ -73,10 +77,14 @@ export async function POST(request: Request) {
     title: title || "",
     status: statusOverride || "APPROVED",
     subtitle: subtitle || null,
+    body_text: bodyTextField || null,
     background_url: backgroundUrlField || null,
     positions: positionsField ? JSON.parse(positionsField) : null,
     overlay_filter: overlayFilter || "purple",
     card_opacity: cardOpacityField ? parseFloat(cardOpacityField) : 0.9,
+    title_size: titleSizeField ? parseFloat(titleSizeField) : 72,
+    subtitle_size: subtitleSizeField ? parseFloat(subtitleSizeField) : 28,
+    body_size: bodySizeField ? parseFloat(bodySizeField) : 20,
     format: formatField || "square",
   };
 

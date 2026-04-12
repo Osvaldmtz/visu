@@ -8,6 +8,8 @@ import type { OverlayFilter } from "./templates";
 import { toDataUrl } from "@/lib/image-utils";
 import { FORMATS, type PostFormat } from "@/lib/formats";
 
+export { CarouselPostCard };
+
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-yellow-500/20 text-yellow-400",
   APPROVED: "bg-green-500/20 text-green-400",
@@ -95,6 +97,7 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
             {renderTemplate(post.layout, {
               title: post.title,
               subtitle: post.subtitle ?? "",
+              bodyText: post.body_text ?? "",
               logoUrl: logoDataUrl,
               primaryColor: brand.primary_color ?? "#7C3DE3",
               backgroundUrl: post.background_url || undefined,
@@ -160,12 +163,166 @@ export function PostCard({ post, brand }: { post: any; brand?: any }) {
             {post.status}
           </span>
         </div>
-        {post.status === "SCHEDULED" && post.scheduled_at && (
-          <p className="text-xs text-blue-400 mb-1">
-            {new Date(post.scheduled_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}
-          </p>
-        )}
+        {post.status === "SCHEDULED" && post.scheduled_at && (() => {
+          const tz = brand?.timezone || "America/Mexico_City";
+          const tzLabel = tz.replace("America/", "").replace(/_/g, " ");
+          const d = new Date(post.scheduled_at);
+          const formatted = d.toLocaleString("es-MX", { timeZone: tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true });
+          return <p className="text-xs text-blue-400 mb-1">{formatted} ({tzLabel})</p>;
+        })()}
         <p className="text-sm text-neutral-300 line-clamp-2">{post.caption}</p>
+      </div>
+    </div>
+  );
+}
+
+function CarouselPostCard({ carousel, brand }: { carousel: any; brand?: any }) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const firstSlide = carousel.slides?.[0];
+  const slideCount = carousel.slides?.length ?? 0;
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm) { setConfirm(true); return; }
+    setDeleting(true);
+    const supabase = createClient();
+    // Delete all slide images from storage
+    for (const url of carousel.image_urls ?? []) {
+      if (url?.includes("/storage/v1/object/public/posts/")) {
+        const path = url.split("/storage/v1/object/public/posts/")[1];
+        if (path) await supabase.storage.from("posts").remove([decodeURIComponent(path)]);
+      }
+    }
+    await supabase.from("carousel_posts").delete().eq("id", carousel.id);
+    router.refresh();
+  };
+
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const [thumbScale, setThumbScale] = useState(0);
+  const [logoDataUrl, setLogoDataUrl] = useState("");
+
+  const canRenderLive = brand && firstSlide?.title && firstSlide?.layout != null;
+
+  const fmt = ((carousel.format ?? "square") as PostFormat);
+  const fmtData = FORMATS[fmt] ?? FORMATS.square;
+
+  const rawLogoUrl = canRenderLive
+    ? (firstSlide.layout <= 1
+        ? brand.logo_light_url || brand.logo_url || ""
+        : brand.logo_dark_url || brand.logo_light_url || brand.logo_url || "")
+    : "";
+
+  useEffect(() => {
+    if (rawLogoUrl) {
+      toDataUrl(rawLogoUrl).then(setLogoDataUrl);
+    } else {
+      setLogoDataUrl("");
+    }
+  }, [rawLogoUrl]);
+
+  useEffect(() => {
+    if (!canRenderLive || !thumbRef.current) return;
+    const update = () => {
+      if (thumbRef.current) setThumbScale(thumbRef.current.offsetWidth / 1080);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(thumbRef.current);
+    return () => ro.disconnect();
+  }, [canRenderLive]);
+
+  return (
+    <div className="bg-surface-light border border-surface-border rounded-xl overflow-hidden hover:border-accent/50 transition-colors group relative">
+      {canRenderLive ? (
+        <div ref={thumbRef} className="bg-neutral-800 relative overflow-hidden" style={{ aspectRatio: fmtData.ratio }}>
+          {thumbScale > 0 && (
+          <div
+            style={{
+              width: 1080,
+              height: fmtData.height,
+              transform: `scale(${thumbScale})`,
+              transformOrigin: "top left",
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          >
+            {renderTemplate(firstSlide.layout, {
+              title: firstSlide.title,
+              subtitle: firstSlide.subtitle ?? "",
+              bodyText: firstSlide.body_text ?? "",
+              logoUrl: logoDataUrl,
+              primaryColor: brand.primary_color ?? "#7C3DE3",
+              backgroundUrl: firstSlide.background_url || undefined,
+              overlayFilter: (firstSlide.overlay_filter ?? "purple") as OverlayFilter,
+              cardOpacity: firstSlide.card_opacity ?? 0.9,
+              height: fmtData.height,
+              positions: firstSlide.positions ?? undefined,
+            })}
+          </div>
+          )}
+          {/* Carousel badge */}
+          <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1 z-10">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            {slideCount} slides
+          </div>
+          {/* Delete button */}
+          {carousel.status !== "PUBLISHED" && (
+            <button
+              onClick={handleDelete}
+              className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all z-10 ${
+                confirm
+                  ? "bg-red-600 text-white opacity-100"
+                  : "bg-black/50 text-white/70 hover:text-white opacity-0 group-hover:opacity-100"
+              }`}
+            >
+              {deleting ? (
+                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              ) : confirm ? "?" : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              )}
+            </button>
+          )}
+        </div>
+      ) : carousel.image_urls?.[0] ? (
+        <div className="relative bg-neutral-800 overflow-hidden" style={{ aspectRatio: fmtData.ratio }}>
+          <img
+            src={carousel.image_urls[0]}
+            alt={carousel.caption}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            {slideCount} slides
+          </div>
+        </div>
+      ) : (
+        <div className="aspect-square bg-neutral-800 flex items-center justify-center">
+          <span className="text-neutral-500 text-sm">No images</span>
+        </div>
+      )}
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-neutral-500">Carrusel</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[carousel.status] ?? ""}`}>
+            {carousel.status}
+          </span>
+        </div>
+        {carousel.status === "SCHEDULED" && carousel.scheduled_at && (() => {
+          const tz = brand?.timezone || "America/Mexico_City";
+          const tzLabel = tz.replace("America/", "").replace(/_/g, " ");
+          const d = new Date(carousel.scheduled_at);
+          const formatted = d.toLocaleString("es-MX", { timeZone: tz, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true });
+          return <p className="text-xs text-blue-400 mb-1">{formatted} ({tzLabel})</p>;
+        })()}
+        <p className="text-sm text-neutral-300 line-clamp-2">{carousel.caption}</p>
       </div>
     </div>
   );

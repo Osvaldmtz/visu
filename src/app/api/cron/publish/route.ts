@@ -30,35 +30,46 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Query failed" }, { status: 500 });
   }
 
-  if (!posts || posts.length === 0) {
+  // Also find scheduled carousels
+  const { data: carousels } = await supabase
+    .from("carousel_posts")
+    .select("id, scheduled_at")
+    .eq("status", "SCHEDULED")
+    .lte("scheduled_at", now);
+
+  const allDue = [
+    ...(posts ?? []).map((p) => ({ ...p, _type: "post" as const })),
+    ...(carousels ?? []).map((c) => ({ ...c, _type: "carousel" as const })),
+  ];
+
+  if (allDue.length === 0) {
     return NextResponse.json({ published: 0, message: "No posts due" });
   }
 
   const results = [];
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://visu-eight.vercel.app";
 
-  for (const post of posts) {
+  for (const item of allDue) {
     try {
-      // Call the publish endpoint internally
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NEXT_PUBLIC_SITE_URL || "https://visu-eight.vercel.app";
+      const endpoint = item._type === "carousel" ? "publish-carousel" : "publish-post";
+      const bodyKey = item._type === "carousel" ? "carouselId" : "postId";
 
-      const res = await fetch(`${baseUrl}/api/publish-post`, {
+      const res = await fetch(`${baseUrl}/api/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId: post.id, apiKey: cronSecret }),
+        body: JSON.stringify({ [bodyKey]: item.id, apiKey: cronSecret }),
       });
 
       const data = await res.json();
-      results.push({ id: post.id, status: res.ok ? "published" : "error", detail: data });
+      results.push({ id: item.id, type: item._type, status: res.ok ? "published" : "error", detail: data });
     } catch (e: any) {
-      results.push({ id: post.id, status: "error", detail: e.message });
+      results.push({ id: item.id, type: item._type, status: "error", detail: e.message });
     }
   }
 
   return NextResponse.json({
     published: results.filter((r) => r.status === "published").length,
-    total: posts.length,
+    total: allDue.length,
     results,
   });
 }

@@ -5,10 +5,14 @@ import type { OverlayFilter } from "./index";
 interface SplitProps {
   title: string;
   subtitle: string;
+  bodyText?: string;
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
+  titleSize?: number;
+  subtitleSize?: number;
+  bodySize?: number;
   height?: number;
   draggable?: boolean;
   scale?: number;
@@ -19,10 +23,14 @@ interface SplitProps {
 export default function SplitTemplate({
   title,
   subtitle,
+  bodyText,
   logoUrl,
   primaryColor,
   backgroundUrl,
   overlayFilter = "none",
+  titleSize = 72,
+  subtitleSize = 28,
+  bodySize = 20,
   height = 1080,
   draggable,
   scale,
@@ -90,7 +98,7 @@ export default function SplitTemplate({
           <h1
             style={{
               color: "#FFFFFF",
-              fontSize: 82,
+              fontSize: titleSize,
               fontWeight: 700,
               lineHeight: 1.05,
               margin: 0,
@@ -119,12 +127,41 @@ export default function SplitTemplate({
             <p
               style={{
                 color: "#D4C4F0",
-                fontSize: 28,
-                fontWeight: 400,
+                fontSize: subtitleSize,
+                fontWeight: 500,
                 margin: 0,
               }}
             >
               {subtitle}
+            </p>
+          </DraggableElement>
+        )}
+
+        {/* Body text */}
+        {bodyText && (
+          <DraggableElement
+            elementId="body"
+            enabled={draggable}
+            scale={scale}
+            defaultPosition={positions?.body}
+            onDragStop={onDragStop}
+            style={{
+              position: "absolute",
+              bottom: 160,
+              left: 60,
+              right: 20,
+            }}
+          >
+            <p
+              style={{
+                color: "rgba(255,255,255,0.6)",
+                fontSize: bodySize,
+                fontWeight: 400,
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              {bodyText}
             </p>
           </DraggableElement>
         )}

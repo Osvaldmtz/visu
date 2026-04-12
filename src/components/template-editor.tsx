@@ -47,6 +47,7 @@ export default function TemplateEditor({
   const [layout, setLayout] = useState(initialLayout);
   const [title, setTitle] = useState(initialTitle);
   const [subtitle, setSubtitle] = useState(initialSubtitle);
+  const [bodyText, setBodyText] = useState("");
   const [caption, setCaption] = useState(initialCaption);
   const [customTopic, setCustomTopic] = useState("");
   const [primaryColor, setPrimaryColor] = useState(brand.primary_color ?? "#7C3DE3");
@@ -56,6 +57,8 @@ export default function TemplateEditor({
   const [savingDraft, setSavingDraft] = useState(false);
   const [currentPostId, setCurrentPostId] = useState(postId ?? null);
   const [generating, setGenerating] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generateError, setGenerateError] = useState("");
   const [photoQuery, setPhotoQuery] = useState("");
   const [photoResults, setPhotoResults] = useState<any[]>([]);
   const [searchingPhotos, setSearchingPhotos] = useState(false);
@@ -91,6 +94,7 @@ export default function TemplateEditor({
   const templateProps = {
     title: title || "Tu titulo aqui",
     subtitle,
+    bodyText,
     logoUrl: logoDataUrl || logoUrl,
     primaryColor,
     backgroundUrl: backgroundUrl || undefined,
@@ -105,6 +109,7 @@ export default function TemplateEditor({
 
   const handleGenerateAI = async () => {
     setGenerating(true);
+    setGenerateError("");
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -112,12 +117,38 @@ export default function TemplateEditor({
         body: JSON.stringify({ brandId: brand.id, layout, format, ...(customTopic ? { customTopic } : {}) }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Error ${res.status}`);
+      }
       if (data.title) setTitle(data.title);
       if (data.subtitle) setSubtitle(data.subtitle);
       if (data.caption) setCaption(data.caption);
       if (data.scheduled_at) setScheduledAt(data.scheduled_at);
+      if (data.backgroundUrl) setBackgroundUrl(data.backgroundUrl);
+    } catch (e: any) {
+      console.error("Generate error:", e);
+      setGenerateError(e.message || "Error al generar contenido");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    setGeneratingImage(true);
+    setGenerateError("");
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, caption, primaryColor, format }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      if (data.backgroundUrl) setBackgroundUrl(data.backgroundUrl);
+    } catch (e: any) {
+      setGenerateError(e.message || "Error al generar imagen");
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -185,6 +216,7 @@ export default function TemplateEditor({
     formData.append("caption", caption);
     formData.append("status", status);
     if (subtitle) formData.append("subtitle", subtitle);
+    if (bodyText) formData.append("body_text", bodyText);
     if (backgroundUrl) formData.append("background_url", backgroundUrl);
     if (currentPostId) formData.append("postId", currentPostId);
     if (scheduledAt) formData.append("scheduled_at", scheduledAt);
@@ -350,6 +382,20 @@ export default function TemplateEditor({
             />
         </div>
 
+        {/* Body text */}
+        <div>
+          <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
+            Body text
+          </label>
+          <textarea
+            value={bodyText}
+            onChange={(e) => setBodyText(e.target.value)}
+            rows={3}
+            placeholder="Parrafo corto de 2-4 lineas..."
+            className="w-full bg-surface-light border border-surface-border rounded-lg px-3 py-2.5 text-white text-sm resize-none focus:outline-none focus:border-accent"
+          />
+        </div>
+
         {/* Caption */}
         <div>
           <label className="text-xs text-neutral-500 uppercase tracking-wider mb-2 block">
@@ -365,13 +411,27 @@ export default function TemplateEditor({
         </div>
 
         {/* Generate with AI */}
-        <button
-          onClick={handleGenerateAI}
-          disabled={generating}
-          className="w-full bg-accent/20 hover:bg-accent/30 disabled:opacity-50 text-accent font-medium py-2.5 rounded-lg transition-colors text-sm border border-accent/30"
-        >
-          {generating ? "Generando..." : "Generar con IA"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleGenerateAI}
+            disabled={generating || generatingImage}
+            className="flex-1 bg-accent/20 hover:bg-accent/30 disabled:opacity-50 text-accent font-medium py-2.5 rounded-lg transition-colors text-sm border border-accent/30"
+          >
+            {generating ? "Generando..." : "Generar con IA"}
+          </button>
+          <button
+            onClick={handleGenerateImage}
+            disabled={generatingImage || generating}
+            className="bg-surface-light hover:bg-surface-border disabled:opacity-50 text-neutral-300 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm border border-surface-border"
+          >
+            {generatingImage ? "..." : "Regenerar imagen"}
+          </button>
+        </div>
+        {generateError && (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <p className="text-sm text-red-400">{generateError}</p>
+          </div>
+        )}
 
         {/* Primary color */}
         <div>

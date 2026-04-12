@@ -5,10 +5,14 @@ import type { OverlayFilter } from "./index";
 interface OverlayProps {
   title: string;
   subtitle?: string;
+  bodyText?: string;
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
+  titleSize?: number;
+  subtitleSize?: number;
+  bodySize?: number;
   height?: number;
   draggable?: boolean;
   scale?: number;
@@ -16,7 +20,7 @@ interface OverlayProps {
   onDragStop?: (elementId: string, position: { x: number; y: number }) => void;
 }
 
-export default function OverlayTemplate({ title, subtitle, logoUrl, primaryColor, backgroundUrl, overlayFilter = "purple", height = 1080, draggable, scale, positions, onDragStop }: OverlayProps) {
+export default function OverlayTemplate({ title, subtitle, bodyText, logoUrl, primaryColor, backgroundUrl, overlayFilter = "purple", titleSize = 72, subtitleSize = 28, bodySize = 20, height = 1080, draggable, scale, positions, onDragStop }: OverlayProps) {
   return (
     <div
       style={{
@@ -118,7 +122,7 @@ export default function OverlayTemplate({ title, subtitle, logoUrl, primaryColor
         <h1
           style={{
             color: "#FFFFFF",
-            fontSize: 72,
+            fontSize: titleSize,
             fontWeight: 700,
             lineHeight: 1.1,
             margin: 0,
@@ -130,9 +134,9 @@ export default function OverlayTemplate({ title, subtitle, logoUrl, primaryColor
         {subtitle && (
           <p
             style={{
-              color: "rgba(255,255,255,0.8)",
-              fontSize: 28,
-              fontWeight: 400,
+              color: "rgba(255,255,255,0.85)",
+              fontSize: subtitleSize,
+              fontWeight: 500,
               margin: 0,
               marginTop: 16,
               textShadow: "0 1px 10px rgba(0,0,0,0.3)",
@@ -142,6 +146,37 @@ export default function OverlayTemplate({ title, subtitle, logoUrl, primaryColor
           </p>
         )}
       </DraggableElement>
+
+      {/* Body text */}
+      {bodyText && (
+        <DraggableElement
+          elementId="body"
+          enabled={draggable}
+          scale={scale}
+          defaultPosition={positions?.body}
+          onDragStop={onDragStop}
+          style={{
+            position: "absolute",
+            bottom: 200,
+            left: 80,
+            right: 80,
+            textAlign: "center",
+          }}
+        >
+          <p
+            style={{
+              color: "rgba(255,255,255,0.65)",
+              fontSize: bodySize,
+              fontWeight: 400,
+              lineHeight: 1.5,
+              margin: 0,
+              textShadow: "0 1px 8px rgba(0,0,0,0.3)",
+            }}
+          >
+            {bodyText}
+          </p>
+        </DraggableElement>
+      )}
     </div>
   );
 }

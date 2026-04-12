@@ -9,11 +9,15 @@ export type OverlayFilter = "none" | "purple" | "dark" | "gradient";
 export interface TemplateProps {
   title: string;
   subtitle?: string;
+  bodyText?: string;
   logoUrl: string;
   primaryColor: string;
   backgroundUrl?: string;
   overlayFilter?: OverlayFilter;
   cardOpacity?: number;
+  titleSize?: number;
+  subtitleSize?: number;
+  bodySize?: number;
   height?: number;
   draggable?: boolean;
   scale?: number;
@@ -25,13 +29,14 @@ export const TEMPLATE_NAMES = ["Overlay", "Split", "Minimal", "Foto"];
 
 export function renderTemplate(layout: number, props: TemplateProps) {
   const { onDragStop, positions, ...rest } = props;
-  const common = { draggable: rest.draggable, scale: rest.scale, positions, onDragStop, overlayFilter: rest.overlayFilter, cardOpacity: rest.cardOpacity, height: rest.height };
+  const common = { draggable: rest.draggable, scale: rest.scale, positions, onDragStop, overlayFilter: rest.overlayFilter, cardOpacity: rest.cardOpacity, titleSize: rest.titleSize, subtitleSize: rest.subtitleSize, bodySize: rest.bodySize, height: rest.height };
   switch (layout) {
     case 0:
       return (
         <OverlayTemplate
           title={rest.title}
           subtitle={rest.subtitle ?? ""}
+          bodyText={rest.bodyText ?? ""}
           logoUrl={rest.logoUrl}
           primaryColor={rest.primaryColor}
           backgroundUrl={rest.backgroundUrl}
@@ -43,6 +48,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
         <SplitTemplate
           title={rest.title}
           subtitle={rest.subtitle ?? ""}
+          bodyText={rest.bodyText ?? ""}
           logoUrl={rest.logoUrl}
           primaryColor={rest.primaryColor}
           backgroundUrl={rest.backgroundUrl}
@@ -54,6 +60,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
         <MinimalTemplate
           title={rest.title}
           subtitle={rest.subtitle ?? ""}
+          bodyText={rest.bodyText ?? ""}
           logoUrl={rest.logoUrl}
           primaryColor={rest.primaryColor}
           {...common}
@@ -64,6 +71,7 @@ export function renderTemplate(layout: number, props: TemplateProps) {
         <PhotoTemplate
           title={rest.title}
           subtitle={rest.subtitle ?? ""}
+          bodyText={rest.bodyText ?? ""}
           logoUrl={rest.logoUrl}
           backgroundUrl={rest.backgroundUrl}
           {...common}

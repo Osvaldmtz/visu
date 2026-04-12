@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { PostCard } from "@/components/post-card";
+import { PostCard, CarouselPostCard } from "@/components/post-card";
 import AutoGenerate from "@/components/auto-generate";
 import CleanupButton from "@/components/cleanup-button";
 import ViewToggle from "@/components/view-toggle";
@@ -44,6 +44,12 @@ export default async function DashboardPage({
 
   const { data: posts } = await supabase
     .from("posts")
+    .select("*")
+    .eq("brand_id", brand.id)
+    .order("created_at", { ascending: false });
+
+  const { data: carousels } = await supabase
+    .from("carousel_posts")
     .select("*")
     .eq("brand_id", brand.id)
     .order("created_at", { ascending: false });
@@ -118,6 +124,12 @@ export default async function DashboardPage({
             >
               Crear manualmente
             </Link>
+            <Link
+              href="/dashboard/carousel"
+              className="hidden sm:block bg-surface-light hover:bg-surface-border text-neutral-300 font-medium px-4 py-2.5 rounded-lg transition-colors text-sm border border-surface-border"
+            >
+              Crear carrusel
+            </Link>
             <AutoGenerate brand={brand} mode="single" />
             <AutoGenerate brand={brand} mode="batch" />
           </div>
@@ -131,8 +143,14 @@ export default async function DashboardPage({
         ) : (() => {
           const gridPosts = (posts ?? []).filter(
             (p) => p.status !== "PUBLISHED" && p.status !== "DISCARDED"
+          ).map((p) => ({ ...p, _type: "post" as const }));
+          const gridCarousels = (carousels ?? []).filter(
+            (c) => c.status !== "PUBLISHED" && c.status !== "DISCARDED"
+          ).map((c) => ({ ...c, _type: "carousel" as const }));
+          const allItems = [...gridPosts, ...gridCarousels].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           );
-          return !gridPosts.length ? (
+          return !allItems.length ? (
             <div className="text-center py-20 border border-dashed border-surface-border rounded-xl">
               <p className="text-neutral-400 mb-4">No posts yet</p>
               <p className="text-sm text-neutral-500">
@@ -141,11 +159,17 @@ export default async function DashboardPage({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {gridPosts.map((post) => (
-                <Link key={post.id} href={`/dashboard/post/${post.id}`}>
-                  <PostCard post={post} brand={brand} />
-                </Link>
-              ))}
+              {allItems.map((item) =>
+                item._type === "carousel" ? (
+                  <Link key={item.id} href={`/dashboard/carousel/${item.id}`}>
+                    <CarouselPostCard carousel={item} brand={brand} />
+                  </Link>
+                ) : (
+                  <Link key={item.id} href={`/dashboard/post/${item.id}`}>
+                    <PostCard post={item} brand={brand} />
+                  </Link>
+                )
+              )}
             </div>
           );
         })()}
